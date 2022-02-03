@@ -1,14 +1,15 @@
 
-library(tagmReDraft)
+suppressMessages(library(pRolocdata))
+suppressMessages(library(pRoloc))
+suppressMessages(library(ggplot2))
+suppressMessages(library(tagmReDraft))
+suppressMessages(library(mdiHelpR))
+suppressMessages(library(magrittr))
+suppressMessages(library(dplyr))
+suppressMessages(library(optparse))
+suppressMessages(library(data.table))
+suppressMessages(library(tidyr))
 
-library(data.table)
-library(pheatmap)
-library(pRolocdata)
-library(dplyr)
-library(ggplot2)
-library(magrittr)
-library(tidyr)
-library(mdiHelpR)
 setMyTheme()
 
 #' @title Prepare MS Object
@@ -77,16 +78,139 @@ prepareMSObject <- function(MS_object) {
   )
 }
 
+
+# User inputs from command line
+input_arguments <- function() {
+  option_list <- list(
+
+    # Convert all files in target destination (default is FALSE)
+    optparse::make_option(c("--data_dir"),
+      type = "character",
+      help = "Path to the directory containing the data.",
+      metavar = "character"
+    ),
+
+    # Number of MCMC iterations
+    optparse::make_option(c("-R", "--R"),
+      type = "numeric",
+      default = 10000,
+      help = "Number of iterations to run in each MCMC chain [default= %default]",
+      metavar = "numeric"
+    ),
+    optparse::make_option(c("-t", "--thin"),
+      type = "numeric",
+      default = 50,
+      help = "Thinning factor in each MCMC chain [default= %default]",
+      metavar = "numeric"
+    ),
+    optparse::make_option(c("-b", "--burn"),
+      type = "numeric",
+      default = 1000,
+      help = paste(
+        "Number of iterations to burn of the warm-up period in each MCMC chain",
+        "[default= %default]"
+      ),
+      metavar = "numeric"
+    ),
+    optparse::make_option(c("-s", "--seed"),
+      type = "numeric",
+      default = 1,
+      help = "Random seed that defines the test/train partition [default= %default]",
+      metavar = "numeric"
+    ),
+    optparse::make_option(c("--n_chains"),
+      type = "numeric",
+      default = 4L,
+      help = "Number of MCMC chains to run [default= %default]",
+      metavar = "numeric"
+    ),
+    optparse::make_option(c("-K", "--K"),
+      type = "numeric",
+      default = NULL,
+      help = paste(
+        "Number of components modelled in each dataset. If a dataset is",
+        "semi-supervised then the number of unique labels is modelled, if",
+        "unsupervised we default to 50."
+      ),
+      metavar = "numeric"
+    ),
+    optparse::make_option(c("--save_dir"),
+      type = "character",
+      default = "./",
+      help = "Directory to save output to [default= %default]",
+      metavar = "character"
+    )
+  )
+
+
+  opt_parser <- optparse::OptionParser(option_list = option_list)
+  opt <- optparse::parse_args(opt_parser)
+}
+
+# === T. gondii analysis =======================================================
+
+cat("\n\n=== PASS INPUTS ===================================================\n")
+
+t0 <- Sys.time()
+
+# ggplot2 theme
+setMyTheme()
+
+# Pass the inputs from the command line
+args <- input_arguments()
+
+# Directories for input and output respectively
+data_dir <- args$data_dir
+save_dir <- args$save_dir
+
+# Random seed used defining this fold
+seed <- args$seed
+
+# MCMC sampler arguments
+R <- args$R
+thin <- args$thin
+burn <- args$burn
+
+# Number of chains modelled
+n_chains <- args$n_chains
+
+# The number of components modelled
+K <- args$K
+
+# Number of clusters modelled in the categorical dataset
+n_clust_unsupervised <- K
+if (is.null(K)) {
+  n_clust_unsupervised <- 100
+}
+
+save_file <- paste0(
+  save_dir,
+  "TGondiiMDI_",
+  "seed_",
+  seed,
+  "_K_",
+  n_clust_unsupervised,
+  "_R_",
+  R,
+  ".rds"
+)
+
+# random seed
+set.seed(seed)
+
+microarray_file <- paste0(data_dir, "ToxoDB_TgME49_Protein-coding_DNA_microarray.txt")
+rna_seq_file <- paste0(data_dir, "ToxoDB_TgME49_Protein-coding_RNA-Seq.txt")
+
 data(Barylyuk2020ToxoLopit)
 
-microarray_data <- fread("./T_gondii/ToxoDB_TgME49_Protein-coding_DNA_microarray.txt",
+microarray_data <- fread(microarray_file,
   na.strings = "N/A",
   strip.white = T,
   header = T,
   select = seq(1, 212)
 )
 
-rna_seq_data <- fread("./T_gondii/ToxoDB_TgME49_Protein-coding_RNA-Seq.txt",
+rna_seq_data <- fread(rna_seq_file,
   na.strings = "N/A",
   strip.white = T,
   header = T,
@@ -113,8 +237,8 @@ rows_containing_nas_in_microarray <- apply(microarray_data, 1, function(x) {
   sum(is.na(x))
 })
 
-table(columns_containing_nas_in_microarray)
-table(rows_containing_nas_in_microarray)
+# table(columns_containing_nas_in_microarray)
+# table(rows_containing_nas_in_microarray)
 
 which_rows_containing_nas_in_microarray <- which(apply(microarray_data, 1, function(x) {
   any(is.na(x))
@@ -248,15 +372,17 @@ initial_labels <- fixed <- matrix(0, nrow = N, ncol = V)
 fixed[, 3] <- final_protein_df$Fixed
 initial_labels[, 3] <- final_protein_df$Label
 
-types <- c("MVN", "MVN", "TAGM")
+types <- c("MVN", "G", "TAGM")
 
-K <- c(100, 100, 26)
+K <- c(
+  n_clust_unsupervised,
+  n_clust_unsupervised,
+  length(pRoloc::getMarkerClasses(Barylyuk2020ToxoLopit))
+)
 
-R <- 5
-thin <- 1
-burn <- 2
+cat("\n\n=== MODELLING =====================================================\n")
 
-mcmc_output <- callMDI(data_modelled,
+mcmc_output <- runMCMCChains(data_modelled, n_chains,
   R = R,
   thin = thin,
   initial_labels = initial_labels,
@@ -265,3 +391,11 @@ mcmc_output <- callMDI(data_modelled,
   types = types
 )
 
+saveRDS(mcmc_output, file = save_file)
+
+cat("\n\n=== SCRIPT COMPLETE ===============================================\n")
+
+t1 <- Sys.time()
+time_taken <- t1 - t0
+
+cat("\n\nTIME TAKEN:", round(time_taken, 2), attr(time_taken, "units"))
