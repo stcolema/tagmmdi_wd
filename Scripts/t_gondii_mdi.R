@@ -107,7 +107,7 @@ input_arguments <- function() {
       type = "numeric",
       default = 1000,
       help = paste(
-        "Number of iterations to burn of the warm-up period in each MCMC chain",
+        "Number of iterations to burn of the warm-up period in each MCMC chain [default= %default]",
         "[default= %default]"
       ),
       metavar = "numeric"
