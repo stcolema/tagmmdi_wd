@@ -350,6 +350,8 @@ cvSingleFold <- function(MS_object, test.idx,
     data.frame() %>% 
     mutate(Iteration = recorded_iteration_indices * thin)
   
+  # Declare an object to return for the mixture model
+  phi_df <- NULL
   if(integrative_analysis) {
     phi_df <- phi_mat %>% 
       data.frame() %>% 
