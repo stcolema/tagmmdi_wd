@@ -102,17 +102,27 @@ input_arguments <- function() {
       help = "Directory to save output to [default= %default]",
       metavar = "character"
     ),
+    
     optparse::make_option(c("-c", "--categorical_column_threshold"),
       type = "numeric",
       default = 0L,
       help = "Required percentage representation in category [default= %default]",
       metavar = "numeric"
     ),
-    optparse::make_option(c("-n", "--number_weights"),
+
+    optparse::make_option(c("--number_weights_sampled"),
       type = "numeric",
-      default = 4L,
-      help = "Number of transfer weights considered [default= %default]",
+      default = 500L,
+      help = "Number of transfer weights actually considered, randomly sampled from the grid generated using the pRoloc functions [default= %default]",
       metavar = "numeric"
+    ),
+
+    
+    optparse::make_option(c("-n", "--number_weights"),
+                          type = "numeric",
+                          default = 4L,
+                          help = "Number of transfer weights considered [default= %default]",
+                          metavar = "numeric"
     )
   )
 
@@ -140,7 +150,9 @@ prepInputsForTransferLearner <- function(MS_object, MS_cat_object, test.idx) {
 
   marker.data.cat <- pRoloc::markerMSnSet(MS_cat_object)
 
-  # cat("\nSplitting data into training and test sets.")
+  cat("\nSplitting data into training and test sets.")
+  cat("\nsize of test set:", (length(test.idx)))
+  cat("\nSize of full dataset:", nrow(MSnbase::exprs(marker.data)))
 
   ## 'unseen' test set
   .test <- MSnbase::MSnSet(
@@ -225,10 +237,11 @@ prepInputsForTransferLearner <- function(MS_object, MS_cat_object, test.idx) {
 
 
 knnSingleFold <- function(MS_object,
-                          MS_cat_object,
-                          test.idx,
-                          number_weights,
-                          seed) {
+                          MS_cat_object, 
+                          test.idx, 
+                          number_weights, 
+                          seed,
+                          number_weights_sampled = NULL) {
   inputs <- prepInputsForTransferLearner(MS_object, MS_cat_object, test.idx)
   d1 <- inputs$data_modelled[[1]]
   d2 <- inputs$data_modelled[[2]]
@@ -241,47 +254,72 @@ knnSingleFold <- function(MS_object,
   test.markers <- inputs$test.markers
 
   # Define the weights to be explored
-  m <- unique(fData(MS_object)$markers.tl)
+  f_data_col <- "markers.tl"
+  m <- unique(fData(MS_object)[[f_data_col]]) # $markers.tl)
+ 
+  if(is.null(m)) {
+    f_data_col <- "markers"
+    m <- unique(fData(MS_object)[[f_data_col]]) # $markers)
+  }
+
   m <- m[m != "unknown"]
+
+  cat("\nNumber of classes:", length(m))
+
   th <- thetas(length(m), length.out = number_weights, verbose = FALSE)
+  n_combinations <- nrow(th)
+  subsetting_of_weights_intended <- ! is.null(number_weights_sampled)
+  if(subsetting_of_weights_intended) {
+    cat("\nSampling weight combinations.")
+    number_weights_sampled <- min(number_weights_sampled, n_combinations)
+    subset_of_weights_considered <- number_weights_sampled != n_combinations
+    if(subset_of_weights_considered) {
+      th_used <- sample(seq(1, nrow(th)),
+        size = number_weights_sampled, 
+        replace = FALSE
+      )
+      th <- th[th_used, ]
+    }
+  }
 
   t0 <- Sys.time()
-
+  
   cat("\nFinding choice of k for main dataset.")
-
+  
   # find the best choice of k for the knn part of the transfer learner
-  kopt <- knnOptimisation(d1,
-    fcol = "markers.tl",
+  kopt <- knnOptimisation(d1, 
+    fcol = f_data_col,
+    # fcol = "markers.tl",
     times = 100,
     k = seq(3, 20, 2),
     verbose = FALSE
   )
-
+  
   best_k_main <- getParams(kopt)
   cat("\nChoice of k for main dataset:", best_k_main)
-
+  
   cat("\n\nFinding choice of k for auxiliary dataset.")
-
-  kopt <- knnOptimisation(d2,
-    fcol = "markers.tl",
+  
+  kopt <- knnOptimisation(d2, 
+    fcol = f_data_col, # "markers.tl",
     times = 100,
     k = seq(3, 20, 2),
     verbose = FALSE,
     seed = seed
   )
-
+  
   best_k_aux <- getParams(kopt)
   cat("\nChoice of k for auxiliary dataset:", best_k_aux)
-
+  
   cat("\n\nFinding best transfer weights for transfer learning algorithm.")
-
+  
   # Find the best transfer weights
   topt <- knntlOptimisation(d1, d2,
     th = th,
     k = c(best_k_main, best_k_aux),
-    fcol = "markers.tl",
+    fcol = f_data_col, # "markers.tl",
     times = 50,
-
+    
     # We only use a single thread on the HPC
     BPPARAM = BiocParallel::SerialParam()
   )
@@ -290,13 +328,13 @@ knnSingleFold <- function(MS_object,
 
   cat("\nBest transfer weights found.\n", bw)
   cat("\n\nPerforming classification.")
-
+  
   ## Applying best *theta* weights {#sec:thclass}
   # Perform the final prediction
   d1 <- knntlClassification(d1, d2,
     bestTheta = bw,
     k = c(3, 3),
-    fcol = "markers.tl"
+    fcol = f_data_col # "markers.tl"
   )
 
   t1 <- Sys.time()
@@ -305,9 +343,9 @@ knnSingleFold <- function(MS_object,
   d1 <- getPredictions(d1, fcol = "knntl")
 
   cat("\nPrediction complete.")
-
+  
   predicted_organelle <- fData(d1)$knntl
-  predicted_class <- class_key$Key[match(predicted_orgnaelle, class_key$Class)]
+  predicted_class <- class_key$Key[match(predicted_organelle, class_key$Class)]
 
   # True allocation for test data
   reference <- factor(test.markers, levels = classes_pres)
@@ -318,6 +356,7 @@ knnSingleFold <- function(MS_object,
 
   comparison_numeric <- predicted_class[test.idx]
 
+  N_test <- length(test.idx)
 
   cat("\nCompute model performance scores.")
 
@@ -327,7 +366,7 @@ knnSingleFold <- function(MS_object,
   cat("\nCalculate the Brier score.")
 
   # Create allocation matrices for truth, filled initially with 0's
-  allocmatrix <- allocation_matrix <- matrix(0,
+ true_allocation_matrix <- knn_allocation_matrix <- matrix(0,
     nrow = N_test,
     ncol = length(classes_pres)
   )
@@ -348,7 +387,7 @@ knnSingleFold <- function(MS_object,
   }
 
   # Compute quadratic loss
-  quadloss <- sum((true_allocation_matrix - knn_allocation_matrix[test.idx, ])^2)
+  quadloss <- sum((true_allocation_matrix - knn_allocation_matrix)^2)
 
   # Return the chains, the point estimates, the true organelles, the quadratic
   # loss score and the prediction scores
@@ -399,6 +438,10 @@ categorical_column_threshold <- args$categorical_column_threshold
 
 # Number of weights considered for each class in the transfer elarning algorithm
 number_weights <- args$number_weights
+
+# For computational reasons we consider a random sample of the 
+# generated weight combinations
+number_weights_sampled <- args$number_weights_sampled
 
 # random seed
 set.seed(seed)
@@ -461,7 +504,8 @@ knn_fold <- knnSingleFold(
   MS_cat_object = d2,
   test.idx = test.idx,
   number_weights = number_weights,
-  seed = seed
+  seed = seed,
+  number_weights_sampled = number_weights_sampled
 )
 
 cat("\n\nKNN transfer learner has run.\n")
