@@ -52,6 +52,9 @@ multiClassF1 <- function(pred, truth) {
     precision <- conf[ii, ii] / sum(conf[ii, ])
     recall <- conf[ii, ii] / sum(conf[, ii])
     f1[ii] <- (2 * precision * recall) / (precision + recall)
+    if(is.na(f1[ii])) {
+      f1[ii] <- 0
+    }
   }
 
   macro_f1 <- mean(f1)
@@ -131,7 +134,37 @@ input_arguments <- function() {
   opt <- optparse::parse_args(opt_parser)
 }
 
-prepInputsForTransferLearner <- function(MS_object, MS_cat_object, test.idx) {
+
+weightCombinations <- function(n_classes, n_weights, n_used = NULL) {
+  
+  weights <- seq(0, 1, by = 1 / (n_weights - 1))
+  total_combinations <- n_weights**n_classes
+  if(n_used > total_combinations) {
+    warning_message <- paste(
+      "Number of requested combinations exceeds the number of possible unique",
+      "combinations.\nReducing to the largest possible amount:",
+      total_combinations
+    )
+    message(warning_message)
+    n_used <- total_combinations
+  }
+  combinations_used <- sample(seq(1, total_combinations), size = n_used)
+  
+  combinations_matrix <- matrix(0, nrow = n_used, ncol = n_classes)
+  for(ii in seq(n_classes)) {
+    combinations_matrix[, ii] <- sample(weights, size = n_used, replace = TRUE)
+  }
+  duplicated_rows <- duplicated.matrix(combinations_matrix)
+  if(any(duplicated_rows)) {
+    combinations_matrix <- combinations_matrix[-duplicated_rows, ]
+  }
+  combinations_matrix
+} 
+
+prepInputsForTransferLearner <- function(MS_object,
+                                         MS_cat_object, 
+                                         test.idx,
+                                         categorical_column_threshold = 0) {
 
   # cat("\nPreparing inputs.")
 
@@ -149,6 +182,7 @@ prepInputsForTransferLearner <- function(MS_object, MS_cat_object, test.idx) {
   # cat("\nAccessing categorical data.\n")
 
   marker.data.cat <- pRoloc::markerMSnSet(MS_cat_object)
+  GO_df <- pRoloc:::subsetAsDataFrame(marker.data.cat, "markers", train = TRUE)
 
   cat("\nSplitting data into training and test sets.")
   cat("\nsize of test set:", (length(test.idx)))
@@ -167,7 +201,12 @@ prepInputsForTransferLearner <- function(MS_object, MS_cat_object, test.idx) {
     MSnbase::fData(marker.data[-test.idx, ]),
     MSnbase::pData(marker.data)
   )
-
+  
+  # Samples in each split
+  N_test <- nrow(.test)
+  N_train <- nrow(.train)
+  test_indices_in_new_data <- seq(N_train + 1, N_test + N_train, 1)
+  
   # save true marker labels
   test.markers <- MSnbase::fData(.test)$markers
   test.labels <- match(test.markers, class_key$Class)
@@ -192,7 +231,8 @@ prepInputsForTransferLearner <- function(MS_object, MS_cat_object, test.idx) {
   )
 
   # hide marker labels
-  MSnbase::fData(main_data)[rownames(.test), "markers"] <- "unknown"
+  MSnbase::fData(main_data)[test_indices_in_new_data, "markers"] <- "unknown"
+  
   # cat("\nEnsure auxiliary data has the same ordering as the main dataset.")
 
   # create new combined MSnset
@@ -201,6 +241,11 @@ prepInputsForTransferLearner <- function(MS_object, MS_cat_object, test.idx) {
     marker.data.cat[test.idx, ]
   )
 
+  
+  informative_terms <- colSums(exprs(auxiliary_data)) > categorical_column_threshold
+  if (any(!informative_terms)) {
+    auxiliary_data <- auxiliary_data[, informative_terms]
+  }
 
   # Set levels of markers cateogries
   levels(MSnbase::fData(auxiliary_data)$markers) <- c(
@@ -211,7 +256,7 @@ prepInputsForTransferLearner <- function(MS_object, MS_cat_object, test.idx) {
   )
 
   # hide marker labels
-  MSnbase::fData(auxiliary_data)[rownames(.test), "markers"] <- "unknown"
+  MSnbase::fData(auxiliary_data)[test_indices_in_new_data, "markers"] <- "unknown"
 
   # cat("\nList of datasets prepared for model call.")
 
@@ -224,7 +269,7 @@ prepInputsForTransferLearner <- function(MS_object, MS_cat_object, test.idx) {
 
   list(
 
-    # Inputs for MDI/mixture model
+    # Inputs for KNN Transfer learner model
     data_modelled = data_modelled,
 
     # Objects used in assessing performance
@@ -241,8 +286,12 @@ knnSingleFold <- function(MS_object,
                           test.idx, 
                           number_weights, 
                           seed,
-                          number_weights_sampled = NULL) {
-  inputs <- prepInputsForTransferLearner(MS_object, MS_cat_object, test.idx)
+                          number_weights_sampled = NULL,
+                          categorical_column_threshold = 0) {
+  inputs <- prepInputsForTransferLearner(MS_object, MS_cat_object, test.idx,
+    categorical_column_threshold = categorical_column_threshold
+  )
+  
   d1 <- inputs$data_modelled[[1]]
   d2 <- inputs$data_modelled[[2]]
 
@@ -252,13 +301,13 @@ knnSingleFold <- function(MS_object,
 
   # Used in assessing performance
   test.markers <- inputs$test.markers
-
+ 
   # Define the weights to be explored
-  f_data_col <- "markers.tl"
+  f_data_col <- "markers"
   m <- unique(fData(MS_object)[[f_data_col]]) # $markers.tl)
  
   if(is.null(m)) {
-    f_data_col <- "markers"
+    f_data_col <- "markers.tl"
     m <- unique(fData(MS_object)[[f_data_col]]) # $markers)
   }
 
@@ -266,21 +315,33 @@ knnSingleFold <- function(MS_object,
 
   cat("\nNumber of classes:", length(m))
 
-  th <- thetas(length(m), length.out = number_weights, verbose = FALSE)
-  n_combinations <- nrow(th)
-  subsetting_of_weights_intended <- ! is.null(number_weights_sampled)
-  if(subsetting_of_weights_intended) {
-    cat("\nSampling weight combinations.")
-    number_weights_sampled <- min(number_weights_sampled, n_combinations)
-    subset_of_weights_considered <- number_weights_sampled != n_combinations
-    if(subset_of_weights_considered) {
-      th_used <- sample(seq(1, nrow(th)),
-        size = number_weights_sampled, 
-        replace = FALSE
-      )
-      th <- th[th_used, ]
-    }
-  }
+  # As for the HEK dataset theta explodes in size (and memory) and gets killed
+  # on the HPC, we use this function which does not guarantee that the number of 
+  # weights sampled is actually the desired amount as there can be reptition and
+  # we reduce to the unique rows.
+  cat("\nSampling weight combinations.")
+  th <- weightCombinations(length(m), number_weights, 
+    n_used = number_weights_sampled
+  )
+  
+  # n_combinations <- number_weights**length(m)
+  # subsetting_of_weights_intended <- ! is.null(number_weights_sampled)
+  # if(subsetting_of_weights_intended) {
+  #   cat("\nSampling weight combinations.")
+  #   number_weights_sampled <- min(number_weights_sampled, n_combinations)
+  #   subset_of_weights_considered <- number_weights_sampled != n_combinations
+  #   if(subset_of_weights_considered) {
+  #     th_used <- sample(seq(1, n_combinations),
+  #       size = number_weights_sampled, 
+  #       replace = FALSE
+  #     )
+  #     th <- thetas(length(m), length.out = number_weights, verbose = FALSE)[th_used, ]
+  #   } else {
+  #     th <- thetas(length(m), length.out = number_weights, verbose = FALSE)
+  #   }
+  # } else {
+  #   th <- thetas(length(m), length.out = number_weights, verbose = FALSE)
+  # }
 
   t0 <- Sys.time()
   
@@ -289,7 +350,6 @@ knnSingleFold <- function(MS_object,
   # find the best choice of k for the knn part of the transfer learner
   kopt <- knnOptimisation(d1, 
     fcol = f_data_col,
-    # fcol = "markers.tl",
     times = 100,
     k = seq(3, 20, 2),
     verbose = FALSE
@@ -301,7 +361,7 @@ knnSingleFold <- function(MS_object,
   cat("\n\nFinding choice of k for auxiliary dataset.")
   
   kopt <- knnOptimisation(d2, 
-    fcol = f_data_col, # "markers.tl",
+    fcol = f_data_col,
     times = 100,
     k = seq(3, 20, 2),
     verbose = FALSE,
@@ -462,7 +522,7 @@ dir.create(save_dir, showWarnings = FALSE)
 save_name <- paste0(
   save_dir,
   paste(datasets, collapse = "_"),
-  "_knnTL_",
+  "_knnTL",
   "_numberWeights_",
   number_weights,
   "_seed_",
@@ -490,9 +550,8 @@ N <- nrow(d1)
 cat("\nReduce categorical dataset in dimensionality.")
 cat("\nThreshold:", categorical_column_threshold)
 
-# Possibly reduce the dimensionality of the categorical dataset depending on
-# the number of entries in each column
-d2 <- d2[, colSums(exprs(d2)) > categorical_column_threshold]
+
+# d2 <- d2[, colSums(exprs(d2)) > categorical_column_threshold]
 
 cat("\n\n=== BEGIN MAIN FUNCTION ===========================================\n")
 
@@ -505,7 +564,8 @@ knn_fold <- knnSingleFold(
   test.idx = test.idx,
   number_weights = number_weights,
   seed = seed,
-  number_weights_sampled = number_weights_sampled
+  number_weights_sampled = number_weights_sampled,
+  categorical_column_threshold = categorical_column_threshold
 )
 
 cat("\n\nKNN transfer learner has run.\n")
