@@ -1,10 +1,10 @@
 #!/usr/bin/Rscript
 # Summary: Creates 3 .csv files of the data modelled and an .rds file of all the
 # inputs for the MDI model in their appropriate format.
-# 
-# Example: Rscript tGondiiMDIInputs.R --R 25000 --thin 50 --seed 1 
-#   --K 125 --save_dir "./" --data_file "./TGondiiMDI_seed_1_K_125.rds"
-# 
+#
+# Example: Rscript tGondiiMDIInputs.R --K 125 --save_dir "./T_gondii/Output/"
+#   --data_dir "./T_gondii/Data/"
+#
 # Author: Stephen Coleman
 suppressMessages(library(pRolocdata))
 suppressMessages(library(pRoloc))
@@ -36,11 +36,11 @@ setMyTheme()
 #'  organelles back to the original naming.
 #' @export
 prepareMSObject <- function(MS_object) {
-  
+
   # Extract the LOPIT data and the organelles
   X <- Biobase::exprs(MS_object)
   organelles <- fData(MS_object)[, "markers"]
-  
+
   # Create a data frame of the classes present and their associated number;\
   # this can be used to map the numeric representation of the classes back to
   # an organelle
@@ -49,34 +49,34 @@ prepareMSObject <- function(MS_object) {
     Organelle = organelles_present,
     Key = 1:length(organelles_present)
   )
-  
+
   # Number of components modelled
   K <- length(organelles_present)
-  
+
   # Number of views modelled
   V <- 1
-  
+
   # Number of samples modelled
   N <- nrow(X)
-  
+
   # Prepare initial labels
   initial_labels <- fixed <- matrix(0, nrow = N, ncol = V)
-  
+
   # Fix training points, allow test points to move component
   fix_vec <- (organelles != "unknown") * 1
   fixed[, 1] <- fix_vec
-  
+
   # Assign initial labels
   initial_labels[, 1] <- class_key$Key[match(organelles, class_key$Organelle)]
-  
+
   # Any unknown labels are given an arbitrary value which will be reset in the
   # model call function.
   initial_labels[is.na(initial_labels)] <- 1
-  
+
   data_modelled <- list(
     X
   )
-  
+
   # Return the prepared objects
   list(
     X = X,
@@ -90,55 +90,54 @@ prepareMSObject <- function(MS_object) {
 # User inputs from command line
 input_arguments <- function() {
   option_list <- list(
-    
+
     # Convert all files in target destination (default is FALSE)
     optparse::make_option(c("--data_dir"),
-                          type = "character",
-                          help = "Path to the directory containing the data.",
-                          metavar = "character"
+      type = "character",
+      help = "Path to the directory containing the data.",
+      metavar = "character"
     ),
-    
     optparse::make_option(c("-K", "--K"),
-                          type = "numeric",
-                          default = NULL,
-                          help = paste(
-                            "Number of components modelled in each dataset. If a dataset is",
-                            "semi-supervised then the number of unique labels is modelled, if",
-                            "unsupervised we default to 50."
-                          ),
-                          metavar = "numeric"
+      type = "numeric",
+      default = NULL,
+      help = paste(
+        "Number of components modelled in each dataset. If a dataset is",
+        "semi-supervised then the number of unique labels is modelled, if",
+        "unsupervised we default to 50."
+      ),
+      metavar = "numeric"
     ),
     optparse::make_option(c("--save_dir"),
-                          type = "character",
-                          default = "./",
-                          help = "Directory to save output to [default= %default]",
-                          metavar = "character"
+      type = "character",
+      default = "./",
+      help = "Directory to save output to [default= %default]",
+      metavar = "character"
     )
   )
-  
-  
+
+
   opt_parser <- optparse::OptionParser(option_list = option_list)
   opt <- optparse::parse_args(opt_parser)
 }
 
 my_heatmap <- function(X, annotation_labels, cluster_rows = FALSE, cluster_cols = FALSE, ...) {
   organelles_present <- sort(unique(annotation_labels$Organelle))
-  
+
   K <- length(organelles_present)
   if (any(is.na(organelles_present))) {
     K <- K - 1
   }
-  
+
   ann_colours <- list("Organelle" = viridis::viridis(K))
   names(ann_colours$Organelle) <- factor(sort(levels(annotation_labels$Organelle)))
-  
+
   col_pal <- colorRampPalette(c("#146EB4", "white", "#FF9900"))(100)
-  
+
   my_breaks <- defineDataBreaks(X, col_pal, mid_point = 0)
   if (min(X) >= 0.0) {
     my_breaks <- defineDataBreaks(X, col_pal, mid_point = median(X))
   }
-  
+
   ordering <- c() # seq(1, nrow(X))
   for (org in organelles_present) {
     org_indices <- which(annotation_labels$Organelle == org)
@@ -148,20 +147,20 @@ my_heatmap <- function(X, annotation_labels, cluster_rows = FALSE, cluster_cols 
     }
     ordering <- c(ordering, org_indices)
   }
-  
+
   X <- X[ordering, ]
   annotation_labels <- annotation_labels[ordering, , drop = FALSE]
-  
+
   ph <- pheatmap(X,
-                 show_colnames = FALSE,
-                 show_rownames = FALSE,
-                 cluster_cols = cluster_cols,
-                 cluster_rows = cluster_rows,
-                 color = col_pal,
-                 breaks = my_breaks,
-                 annotation_row = annotation_labels,
-                 annotation_colors = ann_colours,
-                 ...
+    show_colnames = FALSE,
+    show_rownames = FALSE,
+    cluster_cols = cluster_cols,
+    cluster_rows = cluster_rows,
+    color = col_pal,
+    breaks = my_breaks,
+    annotation_row = annotation_labels,
+    annotation_colors = ann_colours,
+    ...
   )
   ph
 }
@@ -193,9 +192,7 @@ if (is.null(K)) {
 
 save_file <- paste0(
   save_dir,
-  "TGondiiMDI_",
-  "seed_",
-  seed,
+  "TGondiiMDI",
   "_K_",
   n_clust_unsupervised,
   "_input",
@@ -208,17 +205,17 @@ rna_seq_file <- paste0(data_dir, "ToxoDB_TgME49_Protein-coding_RNA-Seq.txt")
 data(Barylyuk2020ToxoLopit)
 
 microarray_data <- fread(microarray_file,
-                         na.strings = "N/A",
-                         strip.white = T,
-                         header = T,
-                         select = seq(1, 212)
+  na.strings = "N/A",
+  strip.white = T,
+  header = T,
+  select = seq(1, 212)
 )
 
 rna_seq_data <- fread(rna_seq_file,
-                      na.strings = "N/A",
-                      strip.white = T,
-                      header = T,
-                      select = seq(1, 255)
+  na.strings = "N/A",
+  strip.white = T,
+  header = T,
+  select = seq(1, 255)
 )
 
 mismatching_order <- any(microarray_data[, 1] != rna_seq_data[, 1])
@@ -302,7 +299,7 @@ final_rna_seq_data <- cleaned_rna_seq_data[retained_rows, ]
 final_protein_df <- protein_df[match(proteins_in_rna_data, protein_df$Protein), ]
 
 all_items_matching <- (all(final_protein_df$Protein == final_rna_seq_data$`Gene ID`) &
-                         all(final_protein_df$Protein == final_microarray_data$`Gene ID`)
+  all(final_protein_df$Protein == final_microarray_data$`Gene ID`)
 )
 
 if (!all_items_matching) {
@@ -370,10 +367,7 @@ K <- c(
 cat("\n\n=== INPUT PREPARED ================================================\n")
 
 mcmc_input <- list(
-  data_modelled = data_modelled, 
-  n_chains = n_chains,
-  R = R,
-  thin = thin,
+  data_modelled = data_modelled,
   initial_labels = initial_labels,
   fixed = fixed,
   K = K,
