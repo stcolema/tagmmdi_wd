@@ -60,6 +60,9 @@ multiClassF1 <- function(pred, truth) {
     precision <- conf[ii, ii] / sum(conf[ii, ])
     recall <- conf[ii, ii] / sum(conf[ , ii])
     f1[ii] <- (2 * precision * recall) / (precision + recall)
+    if(is.na(f1[ii])) {
+      f1[ii] <- 0
+    }
   }
   
   macro_f1 <- mean(f1)
@@ -76,7 +79,8 @@ multiClassF1 <- function(pred, truth) {
 prepInputsForModelRun <- function(MS_object, test.idx,
                                   MS_cat_object = NULL,
                                   # test_size = 0.2,
-                                  n_clust_cat = 50
+                                  n_clust_cat = 50,
+                                  categorical_column_threshold = 0
 ) {
   
   # cat("\nPreparing inputs.")
@@ -180,8 +184,25 @@ prepInputsForModelRun <- function(MS_object, test.idx,
     
     # hide marker labels
     MSnbase::fData(cat_data)[rownames(.test), "markers"] <- "unknown"
+   
+    cat("\nRemoving uninformative columns from the GO dataset.")
+    cat("\nThreshold:", categorical_column_threshold)
+    cat("\nInitial number of columns:", ncol(cat_data))
+    informative_terms <- colSums(exprs(cat_data)) > categorical_column_threshold
+    if (any(!informative_terms)) {
+      cat_data <- cat_data[, informative_terms]
+    }
+    cat("\nNumber of columns after reduction:", ncol(cat_data))
     
     types <- c("TAGM", "C")
+    
+    if(any(fData(cat_data)[, "markers"] != fData(main_data)[, "markers"])) {
+      stop("\n\nERROR: Main and auxiliary data have different markers.\n")
+    }
+    
+    if(any( row.names(cat_data) != row.names(main_data)) ) {
+      stop("\n\nERROR: Main and auxiliary data have differing row names.\n")
+    }
     
     # cat("\nList of datasets prepared for model call.")
     
@@ -225,6 +246,7 @@ cvSingleFold <- function(MS_object, test.idx,
                           thin = 25,
                           n_clust_cat = 50,
                           n_chains = 4,
+                          categorical_column_threshold = 0,
                           ...) {
   
   # Flag indicating if we are using MDI or a mixture model
@@ -243,7 +265,8 @@ cvSingleFold <- function(MS_object, test.idx,
   model_inputs <- prepInputsForModelRun(MS_object, test.idx,
     MS_cat_object = MS_cat_object,
     # test_size = test_size,
-    n_clust_cat = n_clust_cat
+    n_clust_cat = n_clust_cat,
+    categorical_column_threshold = categorical_column_threshold
   )
   
   cat("\n\nModel inputs prepared.")
@@ -254,6 +277,23 @@ cvSingleFold <- function(MS_object, test.idx,
   types <- model_inputs$types
   K <- model_inputs$K
   V <- model_inputs$V
+  
+  cat("\nFit a maximum of N/2 components in the unsupervised data.")
+  N <- nrow(data_modelled[[1]])
+
+
+  cat("\nK:", K)
+  cat("\nN:", N)
+  cat("\nN/2:", floor(N/2))
+ 
+  if(V == 2) { 
+    # Set a limit on the number of components modelled
+    if(K[2] > floor(N / 2)) {
+      cat("\nReducing K.")
+      K[2] <- floor(N / 2)
+      cat("\nK now set to", K[2], "in the GO data.")
+    }
+  }
   
   # Used in validation steps
   test.markers <- model_inputs$test.markers
@@ -488,7 +528,7 @@ categorical_column_threshold <- args$categorical_column_threshold
 # Number of clusters modelled in the categorical dataset
 n_clust_cat <- K
 if(is.null(K))
-  n_clust_cat <- 50
+  n_clust_cat <- 75
 
 # random seed
 set.seed(seed)
@@ -535,12 +575,8 @@ cat("\nData loaded.")
 # Number of samples modelled
 N <- nrow(d1)
 
-cat("\nReduce categorical dataset in dimensionality.")
-cat("\nThreshold:", categorical_column_threshold)
-
 # Possibly reduce the dimensionality of the categorical dataset depending on 
 # the number of entries in each column
-d2 <- d2[, colSums(exprs(d2)) > categorical_column_threshold]
 
 # Use the same test indices across methods
 marker.data <- pRoloc::markerMSnSet(d1)
@@ -572,7 +608,8 @@ mdi_fold <- cvSingleFold(MS_object = d1,
   burn = burn,
   thin = thin,
   n_clust_cat = n_clust_cat,
-  n_chains = n_chains
+  n_chains = n_chains,
+  categorical_column_threshold = categorical_column_threshold
 )
 
 cat("\n\nMDI has run. Now run a TAGM model on the main dataset.\n")
