@@ -88,15 +88,25 @@ library(ggplot2)
 
 plot_dir <- "./T_gondii/Output/Plots/"
 dir.create(plot_dir, showWarnings = FALSE)
-data_dir <- "./T_gondii/Output/"
-files <- list.files(data_dir, pattern = ".rds", full.names = TRUE)
 
+
+# Directories for input and output respectively
+inputdata_dir <- "./T_gondii/Prepared_data/" # args$data_dir
+save_dir <- "./" # args$save_dir
+data_dir <- "./T_gondii/Output/"
+
+files <- list.files(data_dir, 
+                    pattern="(TGondiiMDI).*\\_K_125_R_65000.rds$",
+                    full.names = TRUE)
+
+plotting <- FALSE
 plot_height = 6
 plot_width = 8
 
 n_files <- length(files)
 mcmc_output <- vector("list", n_files)
-burn <- 10000
+burn <- 40000
+
 for(ii in seq(1, n_files)) {
   .f <- files[ii]
   .x <- readRDS(.f)[[1]]
@@ -106,10 +116,13 @@ for(ii in seq(1, n_files)) {
   
   mcmc_output[[ii]]$Chain <- ii
   
+  applied_burn_in <- .mcmc$thin * floor(.mcmc$burn / .mcmc$thin)
+  iterations <- seq(applied_burn_in, .mcmc$R, .mcmc$thin)
+  
   .phi_df <- .mcmc$phis %>% 
     data.frame() %>% 
     set_colnames(c("Phi_12", "Phi_13", "Phi_23")) %>% 
-    mutate(Chain = ii)
+    mutate(Chain = ii, Iteration = iterations)
 
   if(ii == 1) {
     phi_df <- .phi_df
@@ -120,8 +133,9 @@ for(ii in seq(1, n_files)) {
 
 phi_df$Chain <- factor(phi_df$Chain)
 
+if(plotting) {
 phi_df %>% 
-  pivot_longer(-Chain, names_to = "Variable", values_to = "Value") %>% 
+  pivot_longer(-c(Chain, Iteration), names_to = "Variable", values_to = "Value") %>% 
   # filter(Value > ) %>% 
   ggplot(aes(x = Value, fill = factor(Chain))) +
   geom_density(alpha = 0.3) +
@@ -135,7 +149,21 @@ ggsave(paste0(plot_dir, "sampled_phis_across_chains_full.png"),
        width = plot_width)
 
 phi_df %>% 
-  pivot_longer(-Chain, names_to = "Variable", values_to = "Value") %>% 
+  pivot_longer(-c(Chain, Iteration), names_to = "Variable", values_to = "Value") %>% 
+  filter(Variable %in% c("Phi_12", "Phi_23") ) %>%
+  ggplot(aes(x = Iteration, y = Value, colour = factor(Chain))) +
+  geom_line() +
+  facet_wrap(~Variable, ncol = 1, scales = "free") +
+  ggthemes::scale_fill_colorblind() + 
+  labs(title = "Sampled phis across chains",
+       caption = "Dataset 1 is the cell cycle data, 2 is the RNA-seq data and 3 is the LOPIT data")
+
+ggsave(paste0(plot_dir, "sampled_phis_across_chains_trace.png"),
+       height = plot_height,
+       width = plot_width)
+
+phi_df %>% 
+  pivot_longer(-c(Chain, Iteration), names_to = "Variable", values_to = "Value") %>% 
   filter(Value < 50 ) %>%
   ggplot(aes(x = Value, fill = factor(Chain))) +
   geom_density(alpha = 0.3) +
@@ -150,7 +178,7 @@ ggsave(paste0(plot_dir, "sampled_phis_across_chains_lt_50.png"),
        width = plot_width)
 
 phi_df %>% 
-  pivot_longer(-Chain, names_to = "Variable", values_to = "Value") %>% 
+  pivot_longer(-c(Chain, Iteration), names_to = "Variable", values_to = "Value") %>% 
   filter(Value > 1) %>% 
   ggplot(aes(x = Value, group = Variable, fill = Variable)) +
   geom_density() +
@@ -163,7 +191,7 @@ ggsave(paste0(plot_dir, "sampled_phis_across_chains_gt_1_grid.png"),
        width = plot_width)
 
 phi_df %>% 
-  pivot_longer(-Chain, names_to = "Variable", values_to = "Value") %>% 
+  pivot_longer(-c(Chain, Iteration), names_to = "Variable", values_to = "Value") %>% 
   filter(Chain == 1) %>% 
   ggplot(aes(x = Value, group = Variable, fill = Variable)) +
   geom_density() +
@@ -176,7 +204,7 @@ ggsave(paste0(plot_dir, "sampled_phis_chain_1.png"),
        width = plot_width)
 
 phi_df %>% 
-  pivot_longer(-Chain, names_to = "Variable", values_to = "Value") %>% 
+  pivot_longer(-c(Chain, Iteration), names_to = "Variable", values_to = "Value") %>% 
   filter(Chain == 2, Value > 1.0) %>% 
   ggplot(aes(x = Value, group = Variable, fill = Variable)) +
   geom_density() +
@@ -189,7 +217,7 @@ ggsave(paste0(plot_dir, "sampled_phis_chain_2_gt_1.png"),
        width = plot_width)
 
 phi_df %>% 
-  pivot_longer(-Chain, names_to = "Variable", values_to = "Value") %>% 
+  pivot_longer(-c(Chain, Iteration), names_to = "Variable", values_to = "Value") %>% 
   filter(Chain == 3) %>% 
   ggplot(aes(x = Value, group = Variable, fill = Variable)) +
   geom_density() +
@@ -202,7 +230,7 @@ ggsave(paste0(plot_dir, "sampled_phis_chain_3.png"),
        width = plot_width)
 
 phi_df %>% 
-  pivot_longer(-Chain, names_to = "Variable", values_to = "Value") %>% 
+  pivot_longer(-c(Chain, Iteration), names_to = "Variable", values_to = "Value") %>% 
   filter(Chain == 4) %>% 
   ggplot(aes(x = Value, group = Variable, fill = Variable)) +
   geom_density() +
@@ -215,7 +243,7 @@ ggsave(paste0(plot_dir, "sampled_phis_chain_4.png"),
        width = plot_width)
 
 phi_df %>% 
-  pivot_longer(-Chain, names_to = "Variable", values_to = "Value") %>% 
+  pivot_longer(-c(Chain, Iteration), names_to = "Variable", values_to = "Value") %>% 
   filter(Chain == 5) %>% 
   ggplot(aes(x = Value, group = Variable, fill = Variable)) +
   geom_density() +
@@ -228,7 +256,7 @@ ggsave(paste0(plot_dir, "sampled_phis_chain_5.png"),
        width = plot_width)
 
 phi_df %>% 
-  pivot_longer(-Chain, names_to = "Variable", values_to = "Value") %>% 
+  pivot_longer(-c(Chain, Iteration), names_to = "Variable", values_to = "Value") %>% 
   filter(Variable == "Phi_12") %>% 
   ggplot(aes(x = Value, y = stat(ndensity), group = Chain, fill = Chain)) +
   geom_density(alpha = 0.3) +
@@ -243,7 +271,7 @@ ggsave(paste0(plot_dir, "sampled_phi_12_all_chains.png"),
 
 
 phi_df %>% 
-  pivot_longer(-Chain, names_to = "Variable", values_to = "Value") %>% 
+  pivot_longer(-c(Chain, Iteration), names_to = "Variable", values_to = "Value") %>% 
   filter(Variable == "Phi_13", Value < 80) %>% 
   ggplot(aes(x = Value, y = stat(ndensity), group = Chain, fill = Chain)) +
   geom_density(alpha = 0.3) +
@@ -257,7 +285,7 @@ ggsave(paste0(plot_dir, "sampled_phi_13_all_chains.png"),
        width = plot_width)
 
 phi_df %>% 
-  pivot_longer(-Chain, names_to = "Variable", values_to = "Value") %>% 
+  pivot_longer(-c(Chain, Iteration), names_to = "Variable", values_to = "Value") %>% 
   filter(Variable == "Phi_23", Value < 80) %>% 
   ggplot(aes(x = Value, y = stat(ndensity), group = Chain, fill = Chain)) +
   geom_density(alpha = 0.3) +
@@ -269,38 +297,42 @@ phi_df %>%
 ggsave(paste0(plot_dir, "sampled_phi_23_all_chains.png"),
        height = plot_height,
        width = plot_width)
+}
+
+# mcmc_output <- mcmc_output[[1]] # x1[[1]]
+# 
+# R <- mcmc_output$R
+# thin <- mcmc_output$thin
+# iter <- seq(1, R + 1, thin) - 1
+# phi_df <- mcmc_output$phis %>% 
+#   as.data.frame() %>% 
+#   magrittr::set_colnames(c("Phi_12", "Phi_13", "Phi_23")) %>% 
+#   mutate(Iteration = iter) %>% 
+#   pivot_longer(-Iteration, values_to = "Sampled_value", names_to = "Phi")
+# 
+# phi_df %>% 
+#   filter(Iteration > 5000) %>% 
+#   ggplot(aes(x = Sampled_value)) +
+#   geom_histogram() +
+#   facet_wrap(~Phi, scales = "free_x")
+# 
+# phi_df %>% 
+#   filter(Iteration > 5000, Sampled_value < 2000) %>% 
+#   ggplot(aes(x = Sampled_value)) +
+#   geom_histogram() +
+#   facet_wrap(~Phi)
+# 
+# eff_r <- R / thin
+
+predictions <- predictFromMultipleChains(mcmc_output, burn = burn, chains_already_processed = TRUE)
 
 
-mcmc_output <- mcmc_output[[1]] # x1[[1]]
+allocations <- predictions$allocations
+# str(allocations)
 
-R <- mcmc_output$R
-thin <- mcmc_output$thin
-iter <- seq(1, R + 1, thin) - 1
-phi_df <- mcmc_output$phis %>% 
-  as.data.frame() %>% 
-  magrittr::set_colnames(c("Phi_12", "Phi_13", "Phi_23")) %>% 
-  mutate(Iteration = iter) %>% 
-  pivot_longer(-Iteration, values_to = "Sampled_value", names_to = "Phi")
-
-phi_df %>% 
-  filter(Iteration > 5000) %>% 
-  ggplot(aes(x = Sampled_value)) +
-  geom_histogram() +
-  facet_wrap(~Phi, scales = "free_x")
-
-phi_df %>% 
-  filter(Iteration > 5000, Sampled_value < 2000) %>% 
-  ggplot(aes(x = Sampled_value)) +
-  geom_histogram() +
-  facet_wrap(~Phi)
-
-eff_r <- R / thin
-
-allocations <- mcmc_output$allocations[ -seq(1, 100), , ]
-
-fusion_probs_12 <- colSums(allocations[ , ,1] == allocations[, , 2]) / nrow(allocations)
-fusion_probs_13 <- colSums(allocations[ , ,1] == allocations[, , 3]) / nrow(allocations)
-fusion_probs_23 <- colSums(allocations[ , ,2] == allocations[, , 3]) / nrow(allocations)
+fusion_probs_12 <- colSums(allocations[[1]] == allocations[[2]]) / nrow(allocations[[1]])
+fusion_probs_13 <- colSums(allocations[[1]] == allocations[[3]]) / nrow(allocations[[1]])
+fusion_probs_23 <- colSums(allocations[[2]] == allocations[[3]]) / nrow(allocations[[1]])
 
 which(fusion_probs_12 > 0.5)
 which(fusion_probs_13 > 0.5)
@@ -310,13 +342,17 @@ fused_genes_12 <- which(fusion_probs_12 > 0.5)
 fused_genes_13 <- which(fusion_probs_13 > 0.5)
 fused_genes_23 <- which(fusion_probs_23 > 0.5)
 
-# Directories for input and output respectively
-data_dir <- "./T_gondii/" # args$data_dir
-save_dir <- "./" # args$save_dir
+fused_genes <- list(
+  "microarray-rnaseq" = fused_genes_12,
+  "microarray-lopit" = fused_genes_13,
+  "rnaseq-lopit" = fused_genes_23
+)
 
-microarray_file <- paste0(data_dir, "cellCycleNormalised.csv")  # paste0(data_dir, "ToxoDB_TgME49_Protein-coding_DNA_microarray.txt")
-rna_seq_file <- paste0(data_dir, "rnaSeqMacrophage.csv") # paste0(data_dir, "ToxoDB_TgME49_Protein-coding_RNA-Seq.txt")
 
+
+microarray_file <- paste0(inputdata_dir, "cellCycleNormalised.csv")  # paste0(data_dir, "ToxoDB_TgME49_Protein-coding_DNA_microarray.txt")
+rna_seq_file <- paste0(inputdata_dir, "rnaSeqMacrophage.csv") # paste0(data_dir, "ToxoDB_TgME49_Protein-coding_RNA-Seq.txt")
+lopit_file <- paste0(inputdata_dir, "LOPITreduced.csv")
 data(Barylyuk2020ToxoLopit)
 
 microarray_data <- read.csv(microarray_file, row.names = 1, 
@@ -333,47 +369,71 @@ rna_seq_data <- read.csv(rna_seq_file, row.names = 1,
                       # select = seq(1, 255)
 )
 
-data_modelled <- readRDS(paste0(data_dir, "./dataModelled.rds"))
+lopit_data <- read.csv(lopit_file, row.names = 1, 
+                         # na.strings = "N/A",
+                         # strip.white = T,
+                         header = T
+                         # select = seq(1, 255)
+)
+
+data_modelled <- readRDS(paste0(data_dir, "TGondiiMDI_K_125_input.rds"))
+
 # list(
 #   cell_cycle_data,
 #   normalised_cell_cycle_data,
 #   protein_mat
 # )
 
-point_estimate <- processMCMCChain(mcmc_output, burn = 5000, point_estimate_method = "median")
-point_estimate %>% str()
+point_estimate <- predictions$pred
 
-data_df <- final_protein_df
-data_df$Label <- point_estimate$pred[[3]]
+data_df <- lopit_data
+data_df$Predicted_label <- point_estimate[[3]]
 
+protein_lst <- prepareMSObject(Barylyuk2020ToxoLopit)
+measurements <- colnames(Barylyuk2020ToxoLopit)
 
-protein_lst$class_key
-
-long_data_df <- data_df[fused_genes_23, ] %>%
+long_data_df <- data_df[fused_genes_13, ] %>%
   pivot_longer(-c(
     Protein,
     Label,
-    Fixed
+    Fixed,
+    Predicted_label
   ), names_to = "Fraction", values_to = "Value") %>%
   mutate(Fraction = factor(Fraction, levels = measurements, ordered = TRUE),
          Label = factor(Label, 
+                        levels = protein_lst$class_key$Key, 
+                        labels = protein_lst$class_key$Organelle),
+         Predicted_label = factor(Predicted_label, 
                         levels = protein_lst$class_key$Key, 
                         labels = protein_lst$class_key$Organelle))
 
 
 long_data_df %>% 
-  ggplot(aes(x = Fraction, y = Value, colour = Label, group = Protein)) +
+  ggplot(aes(x = Fraction, y = Value, colour = Predicted_label, group = Protein)) +
   geom_line() +
-  facet_wrap(~Label)
+  facet_grid(Fixed~Predicted_label)
 
-fused_microarray_data <- microarray_mat[fused_genes, c(1:27, 124:140)]
-fused_cell_cycle_data <- cell_cycle_data[fused_genes_13, ]
+# fused_microarray_data <- microarray_mat[fused_genes, c(1:27, 124:140)]
+fused_microarray_data <- microarray_data[fused_genes_13, ]
 fused_normalised_cell_cycle_data <- normalised_cell_cycle_data[fused_genes_12, ]
 
-pheatmap::pheatmap(fused_microarray_data[order(data_df$Label[fused_genes]), ], 
+pheatmap::pheatmap(fused_microarray_data[order(data_df$Predicted_label[fused_genes_13]), ], 
                    cluster_rows = F, 
                    cluster_cols = F,
                    show_rownames = FALSE, show_colnames = FALSE)
+
+annotation_row <- factor(data_df$Predicted_label, 
+                         levels = protein_lst$class_key$Key, 
+                         labels = protein_lst$class_key$Organelle) %>% 
+  set_names(row.names(data_df))
+annotatedHeatmap(fused_microarray_data[order(data_df$Predicted_label[fused_genes_13]), ], 
+                 cluster_IDs = annotation_row[fused_genes_13][order(data_df$Predicted_label[fused_genes_13])], 
+                 show_colnames = FALSE, 
+                 show_rownames = FALSE,
+                 cluster_rows = FALSE, 
+                 cluster_cols = FALSE,
+                 main = "Fused genes across cell cycle microarray and LOPIT data",
+                 filename = paste0(save_dir, "cellCycleDataFusedGenes.png"))
 
 pheatmap::pheatmap(fused_cell_cycle_data[order(data_df$Label[fused_genes_13]), ], 
                    cluster_rows = F, 
@@ -395,4 +455,7 @@ protein_mat <- as.matrix(final_protein_df[, -c(31:33)])
 #   rna_mat,
 #   protein_mat
 # )
+
+saveRDS(fused_genes, file = paste0(save_dir, "fusedGenes.rds"))
+saveRDS(predictions, file = paste0(save_dir, "MDIpredictions.rds"))
 
