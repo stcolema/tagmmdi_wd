@@ -205,7 +205,7 @@ prepInputsForTransferLearner <- function(MS_object,
   # Samples in each split
   N_test <- nrow(.test)
   N_train <- nrow(.train)
-  test_indices_in_new_data <- seq(N_train + 1, N_test + N_train, 1)
+  # test_indices_in_new_data <- seq(N_train + 1, N_test + N_train, 1)
   
   # save true marker labels
   test.markers <- MSnbase::fData(.test)$markers
@@ -231,7 +231,7 @@ prepInputsForTransferLearner <- function(MS_object,
   )
 
   # hide marker labels
-  MSnbase::fData(main_data)[test_indices_in_new_data, "markers"] <- "unknown"
+  MSnbase::fData(main_data)[row.names(.test), "markers"] <- "unknown"
   
   # cat("\nEnsure auxiliary data has the same ordering as the main dataset.")
 
@@ -241,12 +241,16 @@ prepInputsForTransferLearner <- function(MS_object,
     marker.data.cat[test.idx, ]
   )
 
-  
+  cat("\nRemoving uninformative columns from the GO dataset.")
+  cat("\nThreshold:", categorical_column_threshold)
+  cat("\nInitial number of columns:", ncol(auxiliary_data))
   informative_terms <- colSums(exprs(auxiliary_data)) > categorical_column_threshold
   if (any(!informative_terms)) {
     auxiliary_data <- auxiliary_data[, informative_terms]
   }
-
+  cat("\nNumber of columns after reduction:", ncol(auxiliary_data))
+  
+  
   # Set levels of markers cateogries
   levels(MSnbase::fData(auxiliary_data)$markers) <- c(
     levels(
@@ -256,13 +260,21 @@ prepInputsForTransferLearner <- function(MS_object,
   )
 
   # hide marker labels
-  MSnbase::fData(auxiliary_data)[test_indices_in_new_data, "markers"] <- "unknown"
+  MSnbase::fData(auxiliary_data)[row.names(.test), "markers"] <- "unknown"
 
+  if(any(fData(auxiliary_data)[, "markers"] != fData(main_data)[, "markers"])) {
+    stop("\n\nERROR: Main and auxiliary data have different markers.\n")
+  }
+  
+  if(any( row.names(auxiliary_data) != row.names(main_data)) ) {
+    stop("\n\nERROR: Main and auxiliary data have differing row names.\n")
+  }
+  
   # cat("\nList of datasets prepared for model call.")
 
   data_modelled <- list(
-    main_data,
-    auxiliary_data
+    main_data = main_data,
+    auxiliary_data = auxiliary_data
   )
 
   # cat("\nOutput list of various inputs to the MDI model.")
@@ -292,8 +304,8 @@ knnSingleFold <- function(MS_object,
     categorical_column_threshold = categorical_column_threshold
   )
   
-  d1 <- inputs$data_modelled[[1]]
-  d2 <- inputs$data_modelled[[2]]
+  d1 <- inputs$data_modelled$main_data
+  d2 <- inputs$data_modelled$auxiliary_data
 
   # Map between organelle as a string and numeric representation
   class_key <- inputs$class_key
@@ -304,12 +316,12 @@ knnSingleFold <- function(MS_object,
  
   # Define the weights to be explored
   f_data_col <- "markers"
-  m <- unique(fData(MS_object)[[f_data_col]]) # $markers.tl)
+  m <- sort(unique(fData(MS_object)[["markers"]])) # $markers.tl)
  
-  if(is.null(m)) {
-    f_data_col <- "markers.tl"
-    m <- unique(fData(MS_object)[[f_data_col]]) # $markers)
-  }
+  # if(is.null(m)) {
+  #   f_data_col <- "markers.tl"
+  #   m <- sort(unique(fData(MS_object)[[f_data_col]])) # $markers)
+  # }
 
   m <- m[m != "unknown"]
 
@@ -349,7 +361,7 @@ knnSingleFold <- function(MS_object,
   
   # find the best choice of k for the knn part of the transfer learner
   kopt <- knnOptimisation(d1, 
-    fcol = f_data_col,
+    fcol = "markers",
     times = 100,
     k = seq(3, 20, 2),
     verbose = FALSE
@@ -361,7 +373,7 @@ knnSingleFold <- function(MS_object,
   cat("\n\nFinding choice of k for auxiliary dataset.")
   
   kopt <- knnOptimisation(d2, 
-    fcol = f_data_col,
+    fcol = "markers",
     times = 100,
     k = seq(3, 20, 2),
     verbose = FALSE,
@@ -374,14 +386,17 @@ knnSingleFold <- function(MS_object,
   cat("\n\nFinding best transfer weights for transfer learning algorithm.")
   
   # Find the best transfer weights
-  topt <- knntlOptimisation(d1, d2,
+  topt <- knntlOptimisation(
+    primary = d1, 
+    auxiliary = d2,
     th = th,
     k = c(best_k_main, best_k_aux),
-    fcol = f_data_col, # "markers.tl",
+    fcol = "markers", # "markers.tl",
     times = 50,
     
     # We only use a single thread on the HPC
-    BPPARAM = BiocParallel::SerialParam()
+    BPPARAM = BiocParallel::SerialParam(),
+    seed = seed
   )
 
   bw <- getParams(topt)
@@ -394,7 +409,7 @@ knnSingleFold <- function(MS_object,
   d1 <- knntlClassification(d1, d2,
     bestTheta = bw,
     k = c(3, 3),
-    fcol = f_data_col # "markers.tl"
+    fcol = "markers" # "markers.tl"
   )
 
   t1 <- Sys.time()
@@ -402,7 +417,7 @@ knnSingleFold <- function(MS_object,
 
   d1 <- getPredictions(d1, fcol = "knntl")
 
-  cat("\nPrediction complete.")
+  cat("\nPrediction complete.\n")
   
   predicted_organelle <- fData(d1)$knntl
   predicted_class <- class_key$Key[match(predicted_organelle, class_key$Class)]
@@ -544,12 +559,15 @@ d2 <- eval(parse(text = datasets[2]))
 
 cat("\nData loaded.")
 
+
+marker.data <- pRoloc::markerMSnSet(d1)
+
+# cat("\nMarker data obtained.")
+
+X <- pRoloc:::subsetAsDataFrame(marker.data, "markers", train = TRUE)
+
 # Number of samples modelled
-N <- nrow(d1)
-
-cat("\nReduce categorical dataset in dimensionality.")
-cat("\nThreshold:", categorical_column_threshold)
-
+N <- nrow(X)
 
 # d2 <- d2[, colSums(exprs(d2)) > categorical_column_threshold]
 
