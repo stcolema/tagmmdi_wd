@@ -52,7 +52,7 @@ multiClassF1 <- function(pred, truth) {
     precision <- conf[ii, ii] / sum(conf[ii, ])
     recall <- conf[ii, ii] / sum(conf[, ii])
     f1[ii] <- (2 * precision * recall) / (precision + recall)
-    if(is.na(f1[ii])) {
+    if (is.na(f1[ii])) {
       f1[ii] <- 0
     }
   }
@@ -105,27 +105,33 @@ input_arguments <- function() {
       help = "Directory to save output to [default= %default]",
       metavar = "character"
     ),
-    
     optparse::make_option(c("-c", "--categorical_column_threshold"),
       type = "numeric",
       default = 0L,
       help = "Required percentage representation in category [default= %default]",
       metavar = "numeric"
     ),
-
     optparse::make_option(c("--number_weights_sampled"),
       type = "numeric",
       default = 500L,
       help = "Number of transfer weights actually considered, randomly sampled from the grid generated using the pRoloc functions [default= %default]",
       metavar = "numeric"
     ),
-
-    
     optparse::make_option(c("-n", "--number_weights"),
-                          type = "numeric",
-                          default = 4L,
-                          help = "Number of transfer weights considered [default= %default]",
-                          metavar = "numeric"
+      type = "numeric",
+      default = 4L,
+      help = "Number of transfer weights considered [default= %default]",
+      metavar = "numeric"
+    ),
+    optparse::make_option(c("--adjust_for_TL"),
+      type = "logical",
+      default = FALSE,
+      help = paste0(
+        "Adjust the test indices to ensure all classes are ",
+        "represented in the training data (as required by the Transfer learner)",
+        " [default= %default]"
+      ),
+      metavar = "logical"
     )
   )
 
@@ -136,10 +142,9 @@ input_arguments <- function() {
 
 
 weightCombinations <- function(n_classes, n_weights, n_used = NULL) {
-  
   weights <- seq(0, 1, by = 1 / (n_weights - 1))
   total_combinations <- n_weights**n_classes
-  if(n_used > total_combinations) {
+  if (n_used > total_combinations) {
     warning_message <- paste(
       "Number of requested combinations exceeds the number of possible unique",
       "combinations.\nReducing to the largest possible amount:",
@@ -149,20 +154,20 @@ weightCombinations <- function(n_classes, n_weights, n_used = NULL) {
     n_used <- total_combinations
   }
   combinations_used <- sample(seq(1, total_combinations), size = n_used)
-  
+
   combinations_matrix <- matrix(0, nrow = n_used, ncol = n_classes)
-  for(ii in seq(n_classes)) {
+  for (ii in seq(n_classes)) {
     combinations_matrix[, ii] <- sample(weights, size = n_used, replace = TRUE)
   }
   duplicated_rows <- duplicated.matrix(combinations_matrix)
-  if(any(duplicated_rows)) {
+  if (any(duplicated_rows)) {
     combinations_matrix <- combinations_matrix[-duplicated_rows, ]
   }
   combinations_matrix
-} 
+}
 
 prepInputsForTransferLearner <- function(MS_object,
-                                         MS_cat_object, 
+                                         MS_cat_object,
                                          test.idx,
                                          categorical_column_threshold = 0) {
 
@@ -191,22 +196,22 @@ prepInputsForTransferLearner <- function(MS_object,
   ## 'unseen' test set
   .test <- MSnbase::MSnSet(
     MSnbase::exprs(marker.data)[test.idx, ],
-    MSnbase::fData(marker.data[test.idx, ]),
+    MSnbase::fData(marker.data)[test.idx, ],
     MSnbase::pData(marker.data)
   )
 
   ## 'seen' training set
   .train <- MSnbase::MSnSet(
     MSnbase::exprs(marker.data)[-test.idx, ],
-    MSnbase::fData(marker.data[-test.idx, ]),
+    MSnbase::fData(marker.data)[-test.idx, ],
     MSnbase::pData(marker.data)
   )
-  
+
   # Samples in each split
   N_test <- nrow(.test)
   N_train <- nrow(.train)
   # test_indices_in_new_data <- seq(N_train + 1, N_test + N_train, 1)
-  
+
   # save true marker labels
   test.markers <- MSnbase::fData(.test)$markers
   test.labels <- match(test.markers, class_key$Class)
@@ -232,7 +237,7 @@ prepInputsForTransferLearner <- function(MS_object,
 
   # hide marker labels
   MSnbase::fData(main_data)[row.names(.test), "markers"] <- "unknown"
-  
+
   # cat("\nEnsure auxiliary data has the same ordering as the main dataset.")
 
   # create new combined MSnset
@@ -249,8 +254,8 @@ prepInputsForTransferLearner <- function(MS_object,
     auxiliary_data <- auxiliary_data[, informative_terms]
   }
   cat("\nNumber of columns after reduction:", ncol(auxiliary_data))
-  
-  
+
+
   # Set levels of markers cateogries
   levels(MSnbase::fData(auxiliary_data)$markers) <- c(
     levels(
@@ -262,14 +267,14 @@ prepInputsForTransferLearner <- function(MS_object,
   # hide marker labels
   MSnbase::fData(auxiliary_data)[row.names(.test), "markers"] <- "unknown"
 
-  if(any(fData(auxiliary_data)[, "markers"] != fData(main_data)[, "markers"])) {
+  if (any(fData(auxiliary_data)[, "markers"] != fData(main_data)[, "markers"])) {
     stop("\n\nERROR: Main and auxiliary data have different markers.\n")
   }
-  
-  if(any( row.names(auxiliary_data) != row.names(main_data)) ) {
+
+  if (any(row.names(auxiliary_data) != row.names(main_data))) {
     stop("\n\nERROR: Main and auxiliary data have differing row names.\n")
   }
-  
+
   # cat("\nList of datasets prepared for model call.")
 
   data_modelled <- list(
@@ -294,16 +299,16 @@ prepInputsForTransferLearner <- function(MS_object,
 
 
 knnSingleFold <- function(MS_object,
-                          MS_cat_object, 
-                          test.idx, 
-                          number_weights, 
+                          MS_cat_object,
+                          test.idx,
+                          number_weights,
                           seed,
                           number_weights_sampled = NULL,
                           categorical_column_threshold = 0) {
   inputs <- prepInputsForTransferLearner(MS_object, MS_cat_object, test.idx,
     categorical_column_threshold = categorical_column_threshold
   )
-  
+
   d1 <- inputs$data_modelled$main_data
   d2 <- inputs$data_modelled$auxiliary_data
 
@@ -313,11 +318,11 @@ knnSingleFold <- function(MS_object,
 
   # Used in assessing performance
   test.markers <- inputs$test.markers
- 
+
   # Define the weights to be explored
   f_data_col <- "markers"
   m <- sort(unique(fData(MS_object)[["markers"]])) # $markers.tl)
- 
+
   # if(is.null(m)) {
   #   f_data_col <- "markers.tl"
   #   m <- sort(unique(fData(MS_object)[[f_data_col]])) # $markers)
@@ -328,14 +333,14 @@ knnSingleFold <- function(MS_object,
   cat("\nNumber of classes:", length(m))
 
   # As for the HEK dataset theta explodes in size (and memory) and gets killed
-  # on the HPC, we use this function which does not guarantee that the number of 
+  # on the HPC, we use this function which does not guarantee that the number of
   # weights sampled is actually the desired amount as there can be reptition and
   # we reduce to the unique rows.
   cat("\nSampling weight combinations.")
-  th <- weightCombinations(length(m), number_weights, 
+  th <- weightCombinations(length(m), number_weights,
     n_used = number_weights_sampled
   )
-  
+
   # n_combinations <- number_weights**length(m)
   # subsetting_of_weights_intended <- ! is.null(number_weights_sampled)
   # if(subsetting_of_weights_intended) {
@@ -344,7 +349,7 @@ knnSingleFold <- function(MS_object,
   #   subset_of_weights_considered <- number_weights_sampled != n_combinations
   #   if(subset_of_weights_considered) {
   #     th_used <- sample(seq(1, n_combinations),
-  #       size = number_weights_sampled, 
+  #       size = number_weights_sampled,
   #       replace = FALSE
   #     )
   #     th <- thetas(length(m), length.out = number_weights, verbose = FALSE)[th_used, ]
@@ -356,44 +361,44 @@ knnSingleFold <- function(MS_object,
   # }
 
   t0 <- Sys.time()
-  
+
   cat("\nFinding choice of k for main dataset.")
-  
+
   # find the best choice of k for the knn part of the transfer learner
-  kopt <- knnOptimisation(d1, 
+  kopt <- knnOptimisation(d1,
     fcol = "markers",
     times = 100,
     k = seq(3, 20, 2),
     verbose = FALSE
   )
-  
+
   best_k_main <- getParams(kopt)
   cat("\nChoice of k for main dataset:", best_k_main)
-  
+
   cat("\n\nFinding choice of k for auxiliary dataset.")
-  
-  kopt <- knnOptimisation(d2, 
+
+  kopt <- knnOptimisation(d2,
     fcol = "markers",
     times = 100,
     k = seq(3, 20, 2),
     verbose = FALSE,
     seed = seed
   )
-  
+
   best_k_aux <- getParams(kopt)
   cat("\nChoice of k for auxiliary dataset:", best_k_aux)
-  
+
   cat("\n\nFinding best transfer weights for transfer learning algorithm.")
-  
+
   # Find the best transfer weights
   topt <- knntlOptimisation(
-    primary = d1, 
+    primary = d1,
     auxiliary = d2,
     th = th,
     k = c(best_k_main, best_k_aux),
     fcol = "markers", # "markers.tl",
     times = 50,
-    
+
     # We only use a single thread on the HPC
     BPPARAM = BiocParallel::SerialParam(),
     seed = seed
@@ -403,7 +408,7 @@ knnSingleFold <- function(MS_object,
 
   cat("\nBest transfer weights found.\n", bw)
   cat("\n\nPerforming classification.")
-  
+
   ## Applying best *theta* weights {#sec:thclass}
   # Perform the final prediction
   d1 <- knntlClassification(d1, d2,
@@ -418,7 +423,7 @@ knnSingleFold <- function(MS_object,
   d1 <- getPredictions(d1, fcol = "knntl")
 
   cat("\nPrediction complete.\n")
-  
+
   predicted_organelle <- fData(d1)$knntl
   predicted_class <- class_key$Key[match(predicted_organelle, class_key$Class)]
 
@@ -441,7 +446,7 @@ knnSingleFold <- function(MS_object,
   cat("\nCalculate the Brier score.")
 
   # Create allocation matrices for truth, filled initially with 0's
- true_allocation_matrix <- knn_allocation_matrix <- matrix(0,
+  true_allocation_matrix <- knn_allocation_matrix <- matrix(0,
     nrow = N_test,
     ncol = length(classes_pres)
   )
@@ -514,9 +519,13 @@ categorical_column_threshold <- args$categorical_column_threshold
 # Number of weights considered for each class in the transfer elarning algorithm
 number_weights <- args$number_weights
 
-# For computational reasons we consider a random sample of the 
+# For computational reasons we consider a random sample of the
 # generated weight combinations
 number_weights_sampled <- args$number_weights_sampled
+
+# Adjust the trest indices to ensure all organelles are represented in the
+# training data as required by the transfer learner
+adjust_training_for_transfer_learner <- args$adjust_for_TL
 
 # random seed
 set.seed(seed)
@@ -541,7 +550,9 @@ save_name <- paste0(
   "_numberWeights_",
   number_weights,
   "_seed_",
-  seed
+  seed,
+  "_trainingAdjustedForTL_",
+  adjust_training_for_transfer_learner
 )
 
 # What will the saved object be called

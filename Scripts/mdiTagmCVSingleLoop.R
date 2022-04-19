@@ -114,14 +114,14 @@ prepInputsForModelRun <- function(MS_object, test.idx,
   ## 'unseen' test set
   .test <- MSnbase::MSnSet(
     MSnbase::exprs(marker.data)[test.idx, ],
-    MSnbase::fData(marker.data[test.idx, ]),
+    MSnbase::fData(marker.data)[test.idx, ],
     MSnbase::pData(marker.data)
   )
   
   ## 'seen' training set
   .train <- MSnbase::MSnSet(
     MSnbase::exprs(marker.data)[-test.idx, ],
-    MSnbase::fData(marker.data[-test.idx, ]),
+    MSnbase::fData(marker.data)[-test.idx, ],
     MSnbase::pData(marker.data)
   )
   
@@ -484,6 +484,16 @@ input_arguments <- function() {
       default = 0L,
       help = "Required percentage representation in category [default= %default]",
       metavar = "numeric"
+    ),
+    
+    optparse::make_option(c("--adjust_for_TL"),
+      type = "logical",
+      default = FALSE,
+      help = paste0("Adjust the test indices to ensure all classes are ",
+        "represented in the training data (as required by the Transfer learner)",
+        " [default= %default]"
+      ),
+      metavar = "logical"
     )
   )
 
@@ -530,6 +540,10 @@ n_clust_cat <- K
 if(is.null(K))
   n_clust_cat <- 75
 
+# Adjust the trest indices to ensure all organelles are represented in the 
+# training data as required by the transfer learner
+adjust_training_for_transfer_learner <- args$adjust_for_TL
+
 # random seed
 set.seed(seed)
 
@@ -554,7 +568,9 @@ save_name <- paste0(
   "_nChains_",
   n_chains,
   "_testSize_",
-  test_size_str
+  test_size_str,
+  "_trainingAdjustedForTL_",
+  adjust_training_for_transfer_learner
 )
 
 # What will the saved object be called
@@ -578,22 +594,55 @@ N <- nrow(d1)
 # Possibly reduce the dimensionality of the categorical dataset depending on 
 # the number of entries in each column
 
-# Use the same test indices across methods
-marker.data <- pRoloc::markerMSnSet(d1)
-X <- pRoloc:::subsetAsDataFrame(marker.data, "markers", train = TRUE)
+# # Use the same test indices across methods
+# marker.data <- pRoloc::markerMSnSet(d1)
+# X <- pRoloc:::subsetAsDataFrame(marker.data, "markers", train = TRUE)
+# 
+# # get sizes
+# # .size <- ceiling(table(MSnbase::fData(marker.data)$markers) * test_size)
+# organelle_representation <- table(MSnbase::fData(marker.data)$markers)
+# .size <- ceiling(organelle_representation * test_size)
+# 
+# if(adjust_training_for_transfer_learner) {
+# organelles_adjusted <- c()
+# for(ii in seq(1, length(organelle_representation))) {
+#   no_training_members <- .size[ii] == organelle_representation[ii]
+#   if(no_training_members) {
+#     org <- names(organelle_representation)[ii]
+#     organelles_adjusted <- c(organelles_adjusted, org)
+#     .size[ii] <- .size[ii] - 1
+#   }
+# }
+# increased_training_size_str <- paste0(organelles_adjusted, collapse = ", ")
+# cat("\nNo training data for",
+#   increased_training_size_str,
+#   "at original test size (", 
+#   test_size,
+#   ").\nCorrecting for the sake of the KNN transfer learner."
+# )
+# }
+# 
+# # strata needs size to be ordered as they appear in data
+# .size <- .size[unique(MSnbase::fData(marker.data)$markers)]
+# 
+# # get strata indices
+# test.idx <- sampling::strata(X, "markers",
+#   size = .size,
+#   method = "srswor"
+# )$ID_unit
 
-# get sizes
-.size <- ceiling(table(MSnbase::fData(marker.data)$markers) * test_size)
-
-# strata needs size to be ordered as they appear in data
-.size <- .size[unique(MSnbase::fData(marker.data)$markers)]
-
-# get strata indices
-test.idx <- sampling::strata(X, "markers",
-  size = .size,
-  method = "srswor"
-)$ID_unit
-
+test_id_list_name <- paste0(
+  save_dir,
+  dataset,
+  "_seed_",
+  seed,
+  "_testSize_",
+  test_size_str,
+  "_trainingAdjustedForTL_",
+  adjust_training_for_transfer_learner,
+  ".rds"
+)
+test_id_list <- readRDS(test_id_list_name)$test.idx
 N_test <- length(test.idx)
 
 cat("\n\n=== BEGIN MAIN FUNCTION ===========================================\n")
@@ -637,6 +686,7 @@ output <- list(
   seed = seed
 )
 
+cat("\nSaving output to:\n", list_save_name)
 saveRDS(output, file = list_save_name)
 
 cat("\n\n=== SCRIPT COMPLETE ===============================================\n")
