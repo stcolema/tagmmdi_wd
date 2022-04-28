@@ -1,22 +1,22 @@
 #!/usr/bin/env Rscript
-# 
+#
 # Title: MDI / TAGM Cross validation (single fold)
 # Description: This script performs a single fold of cross-validation for data
 # from ``pRolocdata``. The user inputs the datasets, the number of iterations to
-# run, the thinning factor within each MCMC chain, the number of samples to 
+# run, the thinning factor within each MCMC chain, the number of samples to
 # discard as part of the warm up, the random seed that defines this fold,
 # the fraction of the data held as a test set, the number of components to model
 # in the unsupervised auxiliary data used in the unsupervised view of MDI,
-# the number of chains to run for each model, the minimum number of entries 
-# needed in a column in the auxiliary dataset to have that column included in 
-# the modelled data, and the directory to save the output to, within which a new 
+# the number of chains to run for each model, the minimum number of entries
+# needed in a column in the auxiliary dataset to have that column included in
+# the modelled data, and the directory to save the output to, within which a new
 # directory with the same name as the main dataset will be created.
-# Output: An .RDS object that holds a list of the model outputs from the fold 
-# and some measures of model performance and fit. 
-# 
-# Example call: 
+# Output: An .RDS object that holds a list of the model outputs from the fold
+# and some measures of model performance and fit.
+#
+# Example call:
 # Rscript mdiTagmCVSingleLoop.R --datasets "tan2009r1 tan2009r1goCC" --R 10000
-# --thin 50 --burn 1000 --seed 1 --test_size 0.75 --K 100 --n_chains 5 
+# --thin 50 --burn 1000 --seed 1 --test_size 0.75 --K 100 --n_chains 5
 # --save_dir "./" --categorical_column_threshold 5
 
 suppressMessages(library(pRolocdata))
@@ -27,44 +27,46 @@ suppressMessages(library(mdiHelpR))
 suppressMessages(library(magrittr))
 suppressMessages(library(dplyr))
 suppressMessages(library(optparse))
+library(RcppParallel)
+RcppParallel::setThreadOptions(numThreads = 1)
 
 # === Functions ================================================================
 
 #' @title multi-class F1
-#' @description Calculate the accuracy, the per-class F1 score and the macro- 
+#' @description Calculate the accuracy, the per-class F1 score and the macro-
 #' and weighted-F1 scores.
 #' @param pred Factor. The predicted classes.
 #' @param truth Factor wit the same levels as ``pred``. The true classification.
-#' @return A list containing ``accuracy``, the prediction accuracy, ``f1``, a 
+#' @return A list containing ``accuracy``, the prediction accuracy, ``f1``, a
 #' vector of the f1 score in each class, ``macro_f1``, the macro f1 score across
 #' classes, and ``weighted_f1``, the f1 score weighted by class membership.
 multiClassF1 <- function(pred, truth) {
-
   mismatch_in_lengths <- length(pred) != length(truth)
-  if(mismatch_in_lengths)
+  if (mismatch_in_lengths) {
     stop("Prediction vector and truth must be of the same length.")
-  
+  }
+
   # Confusion matrix for current fold
   conf <- caret::confusionMatrix(
     data = pred,
     reference = truth
   )$table
-  
+
   N <- length(pred)
   n_levels <- nrow(conf)
   seq_levels <- seq(1, n_levels)
-  
+
   f1 <- rep(0, n_levels)
-  
-  for(ii in seq_levels) {
+
+  for (ii in seq_levels) {
     precision <- conf[ii, ii] / sum(conf[ii, ])
-    recall <- conf[ii, ii] / sum(conf[ , ii])
+    recall <- conf[ii, ii] / sum(conf[, ii])
     f1[ii] <- (2 * precision * recall) / (precision + recall)
-    if(is.na(f1[ii])) {
+    if (is.na(f1[ii])) {
       f1[ii] <- 0
     }
   }
-  
+
   macro_f1 <- mean(f1)
   weighted_f1 <- sum(f1 * colSums(conf)) / N
   accuracy <- sum(pred == truth) / N
@@ -80,44 +82,43 @@ prepInputsForModelRun <- function(MS_object, test.idx,
                                   MS_cat_object = NULL,
                                   # test_size = 0.2,
                                   n_clust_cat = 50,
-                                  categorical_column_threshold = 0
-) {
-  
+                                  categorical_column_threshold = 0) {
+
   # cat("\nPreparing inputs.")
-  
+
   marker.data <- pRoloc::markerMSnSet(MS_object)
-  
+
   # cat("\nMarker data obtained.")
-  
+
   X <- pRoloc:::subsetAsDataFrame(marker.data, "markers", train = TRUE)
   K <- length(pRoloc::getMarkerClasses(MS_object))
-  
+
   # Create a data frame of the classes present and their associated number
   classes_pres <- pRoloc::getMarkerClasses(MS_object)
   class_key <- data.frame(Class = classes_pres, Key = 1:length(classes_pres))
-  
+
   # Number of views modelled
   V <- 1
-  
+
   if (!is.null(MS_cat_object)) {
     # cat("\nAccessing categorical data.\n")
-    
+
     marker.data.cat <- pRoloc::markerMSnSet(MS_cat_object)
     K <- c(K, n_clust_cat)
     V <- 2
-    
+
     # cat("\nCategorical data accessed.")
   }
-  
+
   # cat("\nSplitting data into training and test sets.")
-  
+
   ## 'unseen' test set
   .test <- MSnbase::MSnSet(
     MSnbase::exprs(marker.data)[test.idx, ],
     MSnbase::fData(marker.data)[test.idx, ],
     MSnbase::pData(marker.data)
   )
-  
+
   ## 'seen' training set
   .train <- MSnbase::MSnSet(
     MSnbase::exprs(marker.data)[-test.idx, ],
@@ -125,20 +126,26 @@ prepInputsForModelRun <- function(MS_object, test.idx,
     MSnbase::pData(marker.data)
   )
   
+  N_test <- nrow(.test)
+  N_train <- nrow(.train)
+
   # save true marker labels
   test.markers <- MSnbase::fData(.test)$markers
   test.labels <- match(test.markers, class_key$Class)
-  
+
   # training labels
   train.markers <- MSnbase::fData(.train)$markers
   train.labels <- match(train.markers, class_key$Class)
-  
+
   # cat("\nCombine trainig and test sets.")
-  
+
   # create new combined MSnset
   main_data <- BiocGenerics::combine(.train, .test)
   N <- nrow(main_data)
   
+  # Record internally which proteins are testing/training data
+  MSnbase::fData(main_data)$test.protein <- c(rep(0, N_train), rep(1, N_test))
+
   # Set levels of markers cateogries
   levels(MSnbase::fData(main_data)$markers) <- c(
     levels(
@@ -146,34 +153,35 @@ prepInputsForModelRun <- function(MS_object, test.idx,
     ),
     "unknown"
   )
-  
-  # hide marker labels
+
+  # hide marker labels in the column used for prediction, record truth too
+  MSnbase::fData(main_data)$true.markers <- MSnbase::fData(main_data)$markers
   MSnbase::fData(main_data)[rownames(.test), "markers"] <- "unknown"
-  
+
   initial_labels <- fixed <- matrix(0, nrow = N, ncol = V)
-  
+
   # Fix training points, allow test points to move component
   fix_vec <- (MSnbase::fData(main_data)[, "markers"] != "unknown") * 1
-  
+
   fixed[, 1] <- fix_vec
   initial_labels[, 1] <- c(train.labels, test.labels)
-  
+
   types <- c("TAGM")
-  
+
   data_modelled <- list(
     MSnbase::exprs(main_data)
   )
-  
+
   if (!is.null(MS_cat_object)) {
     # cat("\nEnsure auxiliary data has the same ordering as the main dataset.")
-    
+
     # create new combined MSnset
     cat_data <- BiocGenerics::combine(
       marker.data.cat[-test.idx, ],
       marker.data.cat[test.idx, ]
     )
-    
-    
+
+
     # Set levels of markers cateogries
     levels(MSnbase::fData(cat_data)$markers) <- c(
       levels(
@@ -181,10 +189,10 @@ prepInputsForModelRun <- function(MS_object, test.idx,
       ),
       "unknown"
     )
-    
+
     # hide marker labels
     MSnbase::fData(cat_data)[rownames(.test), "markers"] <- "unknown"
-   
+
     cat("\nRemoving uninformative columns from the GO dataset.")
     cat("\nThreshold:", categorical_column_threshold)
     cat("\nInitial number of columns:", ncol(cat_data))
@@ -193,29 +201,29 @@ prepInputsForModelRun <- function(MS_object, test.idx,
       cat_data <- cat_data[, informative_terms]
     }
     cat("\nNumber of columns after reduction:", ncol(cat_data))
-    
+
     types <- c("TAGM", "C")
-    
-    if(any(fData(cat_data)[, "markers"] != fData(main_data)[, "markers"])) {
+
+    if (any(fData(cat_data)[, "markers"] != fData(main_data)[, "markers"])) {
       stop("\n\nERROR: Main and auxiliary data have different markers.\n")
     }
-    
-    if(any( row.names(cat_data) != row.names(main_data)) ) {
+
+    if (any(row.names(cat_data) != row.names(main_data))) {
       stop("\n\nERROR: Main and auxiliary data have differing row names.\n")
     }
-    
+
     # cat("\nList of datasets prepared for model call.")
-    
+
     data_modelled <- list(
       MSnbase::exprs(main_data),
       MSnbase::exprs(cat_data)
     )
   }
-  
+
   # cat("\nOutput list of various inputs to the MDI model.")
-  
+
   list(
-    
+
     # Inputs for MDI/mixture model
     data_modelled = data_modelled,
     types = types,
@@ -223,34 +231,32 @@ prepInputsForModelRun <- function(MS_object, test.idx,
     initial_labels = initial_labels,
     K = K,
     V = V,
-    
+
     # Objects used in assessing performance
     test.markers = test.markers,
     test.labels = test.labels,
-    
     train.markers = train.markers,
     train.labels = train.labels,
-    
     classes_pres = classes_pres
   )
 }
 
 #' @title CV single fold
-#' @description Performs a single fold of cross validation for either MDI or a 
+#' @description Performs a single fold of cross validation for either MDI or a
 #' mixture model using MS objects available from ``pRolocdata``.
 cvSingleFold <- function(MS_object, test.idx,
-                          MS_cat_object = NULL,
-                          # test_size = 0.2,
-                          num_iter = 1000,
-                          burn = 0,
-                          thin = 25,
-                          n_clust_cat = 50,
-                          n_chains = 4,
-                          categorical_column_threshold = 0,
-                          ...) {
-  
+                         MS_cat_object = NULL,
+                         # test_size = 0.2,
+                         num_iter = 1000,
+                         burn = 0,
+                         thin = 25,
+                         n_clust_cat = 50,
+                         n_chains = 4,
+                         categorical_column_threshold = 0,
+                         ...) {
+
   # Flag indicating if we are using MDI or a mixture model
-  integrative_analysis <- ! is.null(MS_cat_object)
+  integrative_analysis <- !is.null(MS_cat_object)
 
   # Used in the model fit matrices
   eff_r <- floor(num_iter / thin) + 1
@@ -260,7 +266,7 @@ cvSingleFold <- function(MS_object, test.idx,
   recorded_iteration_indices <- seq(eff_burn + 1, eff_r, 1)
 
   cat("\nPreparing model inputs.")
-  
+
   # Convert the input data into the appropriate format for the model call
   model_inputs <- prepInputsForModelRun(MS_object, test.idx,
     MS_cat_object = MS_cat_object,
@@ -268,43 +274,42 @@ cvSingleFold <- function(MS_object, test.idx,
     n_clust_cat = n_clust_cat,
     categorical_column_threshold = categorical_column_threshold
   )
-  
+
   cat("\n\nModel inputs prepared.")
-  
+
   data_modelled <- model_inputs$data_modelled
   initial_labels <- model_inputs$initial_labels
   fixed <- model_inputs$fixed
   types <- model_inputs$types
   K <- model_inputs$K
   V <- model_inputs$V
-  
-  cat("\nFit a maximum of N/2 components in the unsupervised data.")
+
+
   N <- nrow(data_modelled[[1]])
 
+  if (V == 2) {
+    cat("\nFit a maximum of N/2 components in the unsupervised data.")
+    cat("\nNumber of components requested:", K[2])
+    cat("\nUpper bound on number of components:", floor(N / 2))
 
-  cat("\nK:", K)
-  cat("\nN:", N)
-  cat("\nN/2:", floor(N/2))
- 
-  if(V == 2) { 
     # Set a limit on the number of components modelled
-    if(K[2] > floor(N / 2)) {
+    if (K[2] > floor(N / 2)) {
       cat("\nReducing K.")
       K[2] <- floor(N / 2)
       cat("\nK now set to", K[2], "in the GO data.")
     }
   }
-  
+
   # Used in validation steps
   test.markers <- model_inputs$test.markers
   test.labels <- model_inputs$test.labels
   classes_pres <- model_inputs$classes_pres
-  
+
   # Create a data frame of the classes present and their associated number
   class_key <- data.frame(Class = classes_pres, Key = 1:length(classes_pres))
-  
+
   cat("\nModel call.")
-  
+
   # MDI
   mcmc_chains <- runMCMCChains(
     data_modelled,
@@ -316,24 +321,23 @@ cvSingleFold <- function(MS_object, test.idx,
     types,
     K
   )
-  
+
   cat("\nModel has been run.\nMake predictions.")
 
   # Check convergence
-  likelihood_mat <- phi_mat <- matrix(0, 
-    nrow = n_recorded, 
+  likelihood_mat <- phi_mat <- matrix(0,
+    nrow = n_recorded,
     ncol = n_chains
   )
 
-  for(jj in seq(1, n_chains)) {
+  for (jj in seq(1, n_chains)) {
     likelihood_mat[, jj] <- mcmc_chains[[jj]]$complete_likelihood[recorded_iteration_indices]
-    
-    if(integrative_analysis) {
+
+    if (integrative_analysis) {
       phi_mat[, jj] <- mcmc_chains[[jj]]$phis[recorded_iteration_indices]
     }
-    
   }
-  
+
   # Add the column names to the likelihood matrix
   colnames(likelihood_mat) <- paste0("Chain ", seq(1, n_chains))
   colnames(phi_mat) <- paste0("Chain ", seq(1, n_chains))
@@ -341,27 +345,27 @@ cvSingleFold <- function(MS_object, test.idx,
   # Use all of the chains for the point estimates
   combined_chains <- predictFromMultipleChains(mcmc_chains, burn)
   allocation_matrix <- combined_chains$allocation_probability[[1]]
-    
+
   # predicted classes
   predicted_classes <- combined_chains$pred[[1]]
   predicted_organelles <- class_key$Class[predicted_classes]
 
   # True allocation for test data
   reference <- factor(test.markers, levels = classes_pres)
-  
+
   test_indices <- which(fixed[, 1] == 0)
-  
+
   comparison <- factor(predicted_organelles[test_indices],
     levels = classes_pres
   )
-  
+
   cat("\nCompute model performance scores.")
-  
+
   # Calculate the accuracy and the per-class, macro and weighted F1 scores.
   prediction_scores <- multiClassF1(comparison, reference)
 
   cat("\nCalculate the Brier score.")
-  
+
   # Create allocation matrices for truth, filled initially with 0's
   allocmatrix <- matrix(0,
     nrow = N_test,
@@ -383,33 +387,33 @@ cvSingleFold <- function(MS_object, test.idx,
 
   # Compute quadratic loss
   quadloss <- sum((allocmatrix - allocation_matrix[test_indices, ])^2)
-  
-  # Convert hte likelihood matrix to a data frame and add the iterations as a 
+
+  # Convert hte likelihood matrix to a data frame and add the iterations as a
   # variable
-  likelihood_df <- likelihood_mat %>% 
-    data.frame() %>% 
+  likelihood_df <- likelihood_mat %>%
+    data.frame() %>%
     mutate(Iteration = recorded_iteration_indices * thin)
-  
+
   # Declare an object to return for the mixture model
   phi_df <- NULL
-  if(integrative_analysis) {
-    phi_df <- phi_mat %>% 
-      data.frame() %>% 
+  if (integrative_analysis) {
+    phi_df <- phi_mat %>%
+      data.frame() %>%
       mutate(Iteration = recorded_iteration_indices * thin)
   }
-  
-  # Return the chains, the point estimates, the true organelles, the quadratic 
+
+  # Return the chains, the point estimates, the true organelles, the quadratic
   # loss score and the prediction scores
-  list(mcmc_output = mcmc_chains,
-       point_esimates = combined_chains,
-       truth = reference,
-       quadloss = quadloss,
-       prediction_scores = prediction_scores,
-       likelihood_df = likelihood_df,
-       class_key = class_key,
-       phi_df = phi_df # This is non-empty only if MDI is run
+  list(
+    mcmc_output = mcmc_chains,
+    point_esimates = combined_chains,
+    truth = reference,
+    quadloss = quadloss,
+    prediction_scores = prediction_scores,
+    likelihood_df = likelihood_df,
+    class_key = class_key,
+    phi_df = phi_df # This is non-empty only if MDI is run
   )
-       
 }
 
 # User inputs from command line
@@ -485,11 +489,11 @@ input_arguments <- function() {
       help = "Required percentage representation in category [default= %default]",
       metavar = "numeric"
     ),
-    
     optparse::make_option(c("--adjust_for_TL"),
       type = "logical",
       default = FALSE,
-      help = paste0("Adjust the test indices to ensure all classes are ",
+      help = paste0(
+        "Adjust the test indices to ensure all classes are ",
         "represented in the training data (as required by the Transfer learner)",
         " [default= %default]"
       ),
@@ -537,12 +541,29 @@ categorical_column_threshold <- args$categorical_column_threshold
 
 # Number of clusters modelled in the categorical dataset
 n_clust_cat <- K
-if(is.null(K))
+if (is.null(K)) {
   n_clust_cat <- 75
+}
 
-# Adjust the trest indices to ensure all organelles are represented in the 
+# Adjust the trest indices to ensure all organelles are represented in the
 # training data as required by the transfer learner
 adjust_training_for_transfer_learner <- args$adjust_for_TL
+adjust_for_TL <- adjust_training_for_transfer_learner # (adjust_training_for_transfer_learner == "true" || adjust_training_for_transfer_learner == "TRUE")
+
+true_string_passed <- (adjust_training_for_transfer_learner == "true" ||
+  adjust_training_for_transfer_learner == "TRUE"
+)
+
+false_string_passed <- (adjust_training_for_transfer_learner == "false" ||
+  adjust_training_for_transfer_learner == "FALSE"
+)
+
+if (true_string_passed) {
+  adjust_for_TL <- TRUE
+}
+if (false_string_passed) {
+  adjust_for_TL <- FALSE
+}
 
 # random seed
 set.seed(seed)
@@ -552,7 +573,7 @@ datasets <- unlist(stringr::str_split(args$datasets, " "))
 
 test_size_str <- paste0(test_size * 100)
 
-# Use the passed directory appened by the dataset. Create this directory if 
+# Use the passed directory appened by the dataset. Create this directory if
 # required.
 save_dir <- paste0(args$save_dir, datasets[1], "/")
 dir.create(save_dir, showWarnings = FALSE)
@@ -570,7 +591,7 @@ save_name <- paste0(
   "_testSize_",
   test_size_str,
   "_trainingAdjustedForTL_",
-  adjust_training_for_transfer_learner
+  adjust_for_TL
 )
 
 # What will the saved object be called
@@ -591,18 +612,18 @@ cat("\nData loaded.")
 # Number of samples modelled
 N <- nrow(d1)
 
-# Possibly reduce the dimensionality of the categorical dataset depending on 
+# Possibly reduce the dimensionality of the categorical dataset depending on
 # the number of entries in each column
 
 # # Use the same test indices across methods
 # marker.data <- pRoloc::markerMSnSet(d1)
 # X <- pRoloc:::subsetAsDataFrame(marker.data, "markers", train = TRUE)
-# 
+#
 # # get sizes
 # # .size <- ceiling(table(MSnbase::fData(marker.data)$markers) * test_size)
 # organelle_representation <- table(MSnbase::fData(marker.data)$markers)
 # .size <- ceiling(organelle_representation * test_size)
-# 
+#
 # if(adjust_training_for_transfer_learner) {
 # organelles_adjusted <- c()
 # for(ii in seq(1, length(organelle_representation))) {
@@ -616,15 +637,15 @@ N <- nrow(d1)
 # increased_training_size_str <- paste0(organelles_adjusted, collapse = ", ")
 # cat("\nNo training data for",
 #   increased_training_size_str,
-#   "at original test size (", 
+#   "at original test size (",
 #   test_size,
 #   ").\nCorrecting for the sake of the KNN transfer learner."
 # )
 # }
-# 
+#
 # # strata needs size to be ordered as they appear in data
 # .size <- .size[unique(MSnbase::fData(marker.data)$markers)]
-# 
+#
 # # get strata indices
 # test.idx <- sampling::strata(X, "markers",
 #   size = .size,
@@ -633,24 +654,30 @@ N <- nrow(d1)
 
 test_id_list_name <- paste0(
   save_dir,
-  dataset,
+  datasets[1],
   "_seed_",
   seed,
   "_testSize_",
   test_size_str,
   "_trainingAdjustedForTL_",
-  adjust_training_for_transfer_learner,
+  adjust_for_TL,
   ".rds"
 )
-test_id_list <- readRDS(test_id_list_name)$test.idx
+
+cat("\nReading in test indices from:\n", test_id_list_name, sep = "")
+
+test.idx <- readRDS(test_id_list_name)$test.idx
 N_test <- length(test.idx)
+
+cat("\nTest indices successfully read.")
 
 cat("\n\n=== BEGIN MAIN FUNCTION ===========================================\n")
 
 cat("\nMDI validation fold.\n")
 
 # Do a fold of the cross validation for MDI and the single-view mixture model
-mdi_fold <- cvSingleFold(MS_object = d1, 
+mdi_fold <- cvSingleFold(
+  MS_object = d1,
   test.idx = test.idx,
   MS_cat_object = d2,
   num_iter = num_iter,
@@ -663,7 +690,8 @@ mdi_fold <- cvSingleFold(MS_object = d1,
 
 cat("\n\nMDI has run. Now run a TAGM model on the main dataset.\n")
 
-tagm_fold <- cvSingleFold(MS_object = d1, 
+tagm_fold <- cvSingleFold(
+  MS_object = d1,
   test.idx = test.idx,
   num_iter = num_iter,
   burn = burn,
@@ -680,8 +708,8 @@ tagm_fold$likelihood_df$Fold <- seed
 
 # Combine the two objects into a single list and save it
 output <- list(
-  mdi_fold = mdi_fold, 
-  tagm_fold = tagm_fold, 
+  mdi_fold = mdi_fold,
+  tagm_fold = tagm_fold,
   test.idx = test.idx,
   seed = seed
 )
