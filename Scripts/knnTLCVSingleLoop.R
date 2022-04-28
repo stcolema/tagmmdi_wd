@@ -10,7 +10,7 @@
 # Example call:
 # Rscript mdiTagmCVSingleLoop.R --datasets "tan2009r1 tan2009r1goCC" --seed 1
 # --test_indices "./tan2009r1_tan2009r1goCC_R_15000_seed_1_nChains_5_testSize_75.rds"
-# --save_dir "./" --categorical_column_threshold 5
+# --save_dir "./" --categorical_column_threshold 5 --adjust_for_TL TRUE
 
 suppressMessages(library(pRolocdata))
 suppressMessages(library(pRoloc))
@@ -226,6 +226,9 @@ prepInputsForTransferLearner <- function(MS_object,
   # create new combined MSnset
   main_data <- BiocGenerics::combine(.train, .test)
   N <- nrow(main_data)
+  
+  # Record internally which proteins are testing/training data
+  fData(main_data)$test.protein <- c(rep(0, N_train), rep(1, N_test))
 
   # Set levels of markers cateogries
   levels(MSnbase::fData(main_data)$markers) <- c(
@@ -235,7 +238,8 @@ prepInputsForTransferLearner <- function(MS_object,
     "unknown"
   )
 
-  # hide marker labels
+  # hide marker labels in the column used for prediction, record truth too
+  MSnbase::fData(main_data)$true.markers <- MSnbase::fData(main_data)$markers
   MSnbase::fData(main_data)[row.names(.test), "markers"] <- "unknown"
 
   # cat("\nEnsure auxiliary data has the same ordering as the main dataset.")
@@ -369,7 +373,8 @@ knnSingleFold <- function(MS_object,
     fcol = "markers",
     times = 100,
     k = seq(3, 20, 2),
-    verbose = FALSE
+    verbose = FALSE,
+    seed = seed
   )
 
   best_k_main <- getParams(kopt)
@@ -396,7 +401,7 @@ knnSingleFold <- function(MS_object,
     auxiliary = d2,
     th = th,
     k = c(best_k_main, best_k_aux),
-    fcol = "markers", # "markers.tl",
+    fcol = "markers",
     times = 50,
 
     # We only use a single thread on the HPC
@@ -413,7 +418,7 @@ knnSingleFold <- function(MS_object,
   # Perform the final prediction
   d1 <- knntlClassification(d1, d2,
     bestTheta = bw,
-    k = c(3, 3),
+    k = c(best_k_main, best_k_aux),
     fcol = "markers" # "markers.tl"
   )
 
@@ -428,13 +433,17 @@ knnSingleFold <- function(MS_object,
   predicted_class <- class_key$Key[match(predicted_organelle, class_key$Class)]
 
   # True allocation for test data
-  reference <- factor(test.markers, levels = classes_pres)
-
-  comparison <- factor(predicted_organelle[test.idx],
+  reference <- factor(
+    fData(d1)$true.markers[fData(d1)$test.protein == 1], 
     levels = classes_pres
   )
 
-  comparison_numeric <- predicted_class[test.idx]
+  comparison <- factor(
+    fData(d1)$true.markers[fData(d1)$test.protein == 1], #predicted_organelle[test.idx],
+    levels = classes_pres
+  )
+
+  # comparison_numeric <- predicted_class[test.idx]
 
   N_test <- length(test.idx)
 
@@ -526,6 +535,22 @@ number_weights_sampled <- args$number_weights_sampled
 # Adjust the trest indices to ensure all organelles are represented in the
 # training data as required by the transfer learner
 adjust_training_for_transfer_learner <- args$adjust_for_TL
+adjust_for_TL <- adjust_training_for_transfer_learner #
+
+true_string_passed <- (adjust_training_for_transfer_learner == "true" ||
+  adjust_training_for_transfer_learner == "TRUE"
+)
+
+false_string_passed <- (adjust_training_for_transfer_learner == "false" ||
+  adjust_training_for_transfer_learner == "FALSE"
+)
+
+if (true_string_passed) {
+  adjust_for_TL <- TRUE
+}
+if (false_string_passed) {
+  adjust_for_TL <- FALSE
+}
 
 # random seed
 set.seed(seed)
@@ -552,7 +577,7 @@ save_name <- paste0(
   "_seed_",
   seed,
   "_trainingAdjustedForTL_",
-  adjust_training_for_transfer_learner
+  adjust_for_TL
 )
 
 # What will the saved object be called
@@ -571,14 +596,12 @@ d2 <- eval(parse(text = datasets[2]))
 cat("\nData loaded.")
 
 
-marker.data <- pRoloc::markerMSnSet(d1)
-
+# marker.data <- pRoloc::markerMSnSet(d1)
 # cat("\nMarker data obtained.")
-
-X <- pRoloc:::subsetAsDataFrame(marker.data, "markers", train = TRUE)
+# X <- pRoloc:::subsetAsDataFrame(marker.data, "markers", train = TRUE)
 
 # Number of samples modelled
-N <- nrow(X)
+# N <- nrow(X)
 
 # d2 <- d2[, colSums(exprs(d2)) > categorical_column_threshold]
 
