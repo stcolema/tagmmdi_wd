@@ -105,10 +105,10 @@ for(ii in seq(1, n_datasets)) {
   
   .curr_dir <- paste0(data_dir, "/", .d)
   filenames <- list.files(.curr_dir,
-                          pattern = "*_nChains_5_testSize_70.rds", 
+                          pattern = "*_nChains_5_testSize_", 
                           full.names = TRUE)
   knntl_filenames <- list.files(.curr_dir, 
-                                pattern = "*knnTL__numberWeights_5_seed_",
+                                pattern = "*knnTL_numberWeights_5_seed_",
                                 full.names = TRUE
                                 )
   n_folds <- length(filenames)
