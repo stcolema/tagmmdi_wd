@@ -321,7 +321,7 @@ knnSingleFold <- function(MS_object,
   classes_pres <- inputs$classes_pres
 
   # Used in assessing performance
-  test.markers <- inputs$test.markers
+  # test.markers <- inputs$test.markers
 
   # Define the weights to be explored
   f_data_col <- "markers"
@@ -432,20 +432,14 @@ knnSingleFold <- function(MS_object,
   predicted_organelle <- fData(d1)$knntl
   predicted_class <- class_key$Key[match(predicted_organelle, class_key$Class)]
 
+  true_test_ids <- which(fData(d1)$test.protein == 1)
+  N_test <- length(true_test_ids)
+  true_markers <- fData(d1)$true.markers[true_test_ids]
+  predicted_markers <- fData(d1)$knntl[true_test_ids]
+  
   # True allocation for test data
-  reference <- factor(
-    fData(d1)$true.markers[fData(d1)$test.protein == 1], 
-    levels = classes_pres
-  )
-
-  comparison <- factor(
-    fData(d1)$true.markers[fData(d1)$test.protein == 1], #predicted_organelle[test.idx],
-    levels = classes_pres
-  )
-
-  # comparison_numeric <- predicted_class[test.idx]
-
-  N_test <- length(test.idx)
+  reference <- factor(true_markers, levels = classes_pres)
+  comparison <- factor(predicted_markers, levels = classes_pres)
 
   cat("\nCompute model performance scores.")
 
@@ -465,14 +459,15 @@ knnSingleFold <- function(MS_object,
   class_numerics <- seq(1, length(unique(test.markers)))
 
   # create allocation matrix
-  for (j in seq_along(test.idx)) {
+  for (j in seq_along(true_test_ids)) {
     # The class the current individual belongs to
-    alloc <- as.numeric(test.markers, class_numerics)[j]
+    true_alloc <- as.numeric(true_markers[j], class_numerics)
+    knn_alloc <- as.numeric(predicted_markers[j], class_numerics)
+    # alloc <- as.numeric(test.markers, class_numerics)[j]
 
     # Enter this in the allocation matrix
-    true_allocation_matrix[j, alloc] <- 1
-
-    knn_allocation_matrix[j, comparison_numeric[j]] <- 1
+    true_allocation_matrix[j, true_alloc] <- 1
+    knn_allocation_matrix[j, knn_alloc] <- 1
   }
 
   # Compute quadratic loss
