@@ -8,9 +8,11 @@
 # Output:
 #
 # Example call:
-# Rscript mdiTagmCVSingleLoop.R --datasets "tan2009r1 tan2009r1goCC" --seed 1
-# --test_indices "./tan2009r1_tan2009r1goCC_R_15000_seed_1_nChains_5_testSize_75.rds"
-# --save_dir "./" --categorical_column_threshold 5 --adjust_for_TL TRUE
+# Rscript knnTLCVSingleLoop.R --datasets 'tan2009r1 tan2009r1goCC' --seed 1 
+# --test_indices ./test_50/tan2009r1/tan2009r1_seed_1_testSize_50_trainingAdjustedForTL_TRUE.rds
+# --save_dir ./test_50/ --categorical_column_threshold 3 --number_weights 5
+# --number_weights_sampled 20000
+
 
 suppressMessages(library(pRolocdata))
 suppressMessages(library(pRoloc))
@@ -249,6 +251,17 @@ prepInputsForTransferLearner <- function(MS_object,
     marker.data.cat[-test.idx, ],
     marker.data.cat[test.idx, ]
   )
+  # Set levels of markers cateogries
+  levels(MSnbase::fData(auxiliary_data)$markers) <- c(
+    levels(
+      MSnbase::fData(auxiliary_data)$markers
+    ),
+    "unknown"
+  )
+  
+  # hide marker labels in the column used for prediction, record truth too
+  MSnbase::fData(auxiliary_data)$true.markers <- MSnbase::fData(auxiliary_data)$markers
+  MSnbase::fData(auxiliary_data)[row.names(.test), "markers"] <- "unknown"
 
   cat("\nRemoving uninformative columns from the GO dataset.")
   cat("\nThreshold:", categorical_column_threshold)
