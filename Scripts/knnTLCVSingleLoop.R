@@ -456,7 +456,7 @@ knnSingleFold <- function(MS_object,
 
   # The numbers associated with the classes (i.e. numerical representation of
   # the classes)
-  class_numerics <- seq(1, length(unique(test.markers)))
+  class_numerics <- seq(1, length(unique(true_markers)))
 
   # create allocation matrix
   for (j in seq_along(true_test_ids)) {
