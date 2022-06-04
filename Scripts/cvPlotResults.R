@@ -6,6 +6,9 @@ library(tagmReDraft)
 library(magrittr)
 library(ggthemes)
 library(pRolocdata)
+library(optparse)
+
+
 
 setMyTheme()
 sim_col_pal <- simColPal()
@@ -82,38 +85,28 @@ for (dataset in datasets) {
   }
 }
 
-# dataset_names <- data.frame("Clean" = c("Callus", "Root", "Human", "Mouse"),
-#                             "Original" = c("dunkley2006", "groen2014r1", "HEK293T2011", "E14TG2aS1")
-# )
-# dataset_names$Clean[match(result_df$Dataset, dataset_names$Original)]
-
 result_df$Dataset <- factor(result_df$Dataset, 
-       labels = c("Callus", "Root", "Human", "Mouse"), 
-       levels = c("dunkley2006", "groen2014r1", "HEK293T2011", "E14TG2aS1")
+  labels = c("Callus", "Root", "Human", "Mouse"), 
+  levels = c("dunkley2006", "groen2014r1", "HEK293T2011", "E14TG2aS1")
 )
 
 result_df$Model <- factor(result_df$Model, 
-                          labels = c("MDI", "TAGM", "TL"),
-                          levels = c("TAGM", "MDI", "KNN_TL"))
+  labels = c("MDI", "TAGM", "TL"),
+  levels = c("TAGM", "MDI", "KNN_TL")
+)
 
 long_result_df <- result_df %>%
   pivot_longer(-c(Model, Seed, Dataset, Test_frac),
-               names_to = "Score",
-               values_to = "Value"
+    names_to = "Score",
+    values_to = "Value"
   ) 
 
 long_result_df$Score <- factor(long_result_df$Score,
-       labels = c("Accuracy", "Macro F1", "Weighted F1", "Brier loss"),
-       levels = c("Accuracy", "Macro_F1", "Weighted_F1", "Brier_loss")
+  labels = c("Accuracy", "Macro F1", "Weighted F1", "Brier loss"),
+  levels = c("Accuracy", "Macro_F1", "Weighted_F1", "Brier_loss")
 )
 
 long_result_df[["Test fraction"]] <- long_result_df$Test_frac * 0.01
-
-# result_df %>%
-#   pivot_longer(-c(Model, Seed, Dataset, Test_frac),
-#     names_to = "Score",
-#     values_to = "Value"
-#   ) %>%
 
 # Use the colorblind palette from ggthemes, skipping black
 my_palette <- ggthemes::colorblind_pal()(4)[2:4]
@@ -122,8 +115,7 @@ p_out <- long_result_df %>%
   ggplot(aes(x = Model, y = Value)) +
   geom_boxplot(aes(fill = Model)) +
   facet_grid(Score ~ Dataset + `Test fraction`, scales = "free", labeller = label_both) +
-  # ggthemes::scale_fill_colorblind() 
   scale_fill_manual(values = my_palette)
 
 write.csv(result_df, file = result_csv_file)
-ggsave(filename = result_plot_file, plot = p_out, width = 12, height = 8)
+ggsave(filename = result_plot_file, plot = p_out, width = 16, height = 8)
