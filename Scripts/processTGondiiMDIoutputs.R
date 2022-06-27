@@ -2,8 +2,9 @@
 
 suppressMessages(library(pRolocdata))
 suppressMessages(library(pRoloc))
-suppressMessages(library(ggplot2))
 suppressMessages(library(tagmReDraft))
+suppressMessages(library(ggplot2))
+suppressMessages(library(ggthemes))
 suppressMessages(library(mdiHelpR))
 suppressMessages(library(magrittr))
 suppressMessages(library(dplyr))
@@ -81,6 +82,12 @@ dir.create(plot_dir, showWarnings = FALSE)
 
 R <- args$R # 25000
 K <- args$K # 125
+
+burn <- args$burn
+if(is.null(burn)) {
+  burn <- floor(0.2 * R)
+}
+
 pattern <- paste0("(TGondiiMDI).*\\_K_", K, "_R_", R, ".rds$")
 # pattern <- paste0("(TGondii_RNAseq).*\\_K_", K, "_R_", R, "_type_G.rds$")
 files <- list.files(model_output_dir,
@@ -95,13 +102,14 @@ plot_width <- 8
 
 n_files <- length(files)
 mcmc_output <- vector("list", n_files)
-burn <- floor(0.2 * R)
 
 cell_cycle_psms <- list()
 rna_seq_psms <- list()
 lopit_psms <- list()
 
 # === Processing and input data ================================================
+
+cat("\n# === Processing and input data =========================================")
 
 for (ii in seq(1, n_files)) {
   .f <- files[ii]
@@ -114,7 +122,7 @@ for (ii in seq(1, n_files)) {
   mcmc_output[[ii]]$Chain <- ii
 
   applied_burn_in <- .mcmc$thin * floor(.mcmc$burn / .mcmc$thin)
-  iterations <- seq(applied_burn_in, .mcmc$R, .mcmc$thin)
+  iterations <- seq(applied_burn_in + .mcmc$thin, .mcmc$R, .mcmc$thin)
 
   .phi_df <- .mcmc$phis %>%
     data.frame() %>%
@@ -129,7 +137,7 @@ for (ii in seq(1, n_files)) {
   .evidence_df <- .mcmc$evidence |>
     data.frame() %>%
     set_colnames(c("Evidence")) %>%
-    mutate(Chain = ii, Iteration = iterations[-1])
+    mutate(Chain = ii, Iteration = iterations)
 
 
   cell_cycle_psms[[ii]] <- mdiHelpR::makePSM(.mcmc$allocations[, , 1])
@@ -149,7 +157,7 @@ for (ii in seq(1, n_files)) {
 
 phi_df$Chain <- factor(phi_df$Chain)
 alpha_df$Chain <- factor(alpha_df$Chain)
-
+evidence_df$Chain <- factor(evidence_df$Chain)
 
 predictions <- predictFromMultipleChains(mcmc_output, burn = burn, chains_already_processed = TRUE)
 
@@ -160,10 +168,6 @@ allocations <- predictions$allocations
 fusion_probs_12 <- colSums(allocations[[1]] == allocations[[2]]) / nrow(allocations[[1]])
 fusion_probs_13 <- colSums(allocations[[1]] == allocations[[3]]) / nrow(allocations[[1]])
 fusion_probs_23 <- colSums(allocations[[2]] == allocations[[3]]) / nrow(allocations[[1]])
-
-which(fusion_probs_12 > 0.5)
-which(fusion_probs_13 > 0.5)
-which(fusion_probs_23 > 0.5)
 
 fused_genes_12 <- which(fusion_probs_12 > 0.5)
 fused_genes_13 <- which(fusion_probs_13 > 0.5)
@@ -210,11 +214,47 @@ data_modelled <- readRDS(paste0(inputdata_dir, "TGondiiMDI_K_125_input.rds"))
 
 # === Plotting =================================================================
 
-cell_cycle_psm_df <- prepSimilarityMatricesForGGplot(cell_cycle_psms)
-rna_seq_psm_df <- prepSimilarityMatricesForGGplot(rna_seq_psms)
-lopit_psm_df <- prepSimilarityMatricesForGGplot(lopit_psms)
+cat("\n# === Plotting ==========================================================")
+
+cell_cycle_psm_df <- prepSimilarityMatricesForGGplot(cell_cycle_psms, ignore_checks = TRUE)
+rna_seq_psm_df <- prepSimilarityMatricesForGGplot(rna_seq_psms, ignore_checks = TRUE)
+lopit_psm_df <- prepSimilarityMatricesForGGplot(lopit_psms, ignore_checks = TRUE)
 
 if (plotting) {
+  cat("\nEvidence plots.")
+  p_evidence_density <- evidence_df %>%
+    ggplot(aes(x = Evidence, fill = Chain)) +
+    geom_density(alpha = 0.3) +
+    ggthemes::scale_fill_colorblind() +
+    labs(
+      title = "Marginal likelihood across chains",
+      caption = "Dataset 1 is the cell cycle data, 2 is the RNA-seq data and 3 is the LOPIT data"
+    )
+
+  ggsave(paste0(plot_dir, "marginal_llikelihood_density.png"),
+    plot = p_evidence_density,
+    height = plot_height,
+    width = plot_width
+  )
+
+
+  p_evidence_trace <- evidence_df %>%
+    ggplot(aes(x = Iteration, y = Evidence, colour = Chain)) +
+    geom_line() +
+    ggthemes::scale_color_colorblind() +
+    labs(
+      title = "Marginal likelihood across chains",
+      caption = "Dataset 1 is the cell cycle data, 2 is the RNA-seq data and 3 is the LOPIT data"
+   )
+  
+  ggsave(paste0(plot_dir, "marginal_llikelihood_trace.png"),
+    plot = p_evidence_trace,
+    height = plot_height,
+    width = plot_width
+  )
+
+  cat("\nPhi plots.")
+
   p_phis <- phi_df %>%
     pivot_longer(-c(Chain, Iteration), names_to = "Variable", values_to = "Value") %>%
     # filter(Value > ) %>%
@@ -227,15 +267,33 @@ if (plotting) {
       caption = "Dataset 1 is the cell cycle data, 2 is the RNA-seq data and 3 is the LOPIT data"
     )
 
-  ggsave(paste0(plot_dir, "sampled_phis_across_chains_full.png"),
-    plot = p_alphas,
+  ggsave(paste0(plot_dir, "sampled_phis_density.png"),
+    plot = p_phis,
     height = plot_height,
     width = plot_width
   )
 
-  p_alphas <- alpha_df %>%
+  p_phis_trace <- phi_df %>%
     pivot_longer(-c(Chain, Iteration), names_to = "Variable", values_to = "Value") %>%
-    # filter(Value > ) %>%
+    filter(Variable %in% c("Phi_12", "Phi_23")) %>%
+    ggplot(aes(x = Iteration, y = Value, colour = Chain)) +
+    geom_line() +
+    facet_wrap(~Variable, ncol = 1, scales = "free") +
+    ggthemes::scale_fill_colorblind() +
+    labs(
+      title = "Sampled phis across chains",
+      caption = "Dataset 1 is the cell cycle data, 2 is the RNA-seq data and 3 is the LOPIT data"
+    )
+
+  ggsave(paste0(plot_dir, "sampled_phis_trace.png"),
+    plot = p_phis_trace,
+    height = plot_height,
+    width = plot_width
+  )
+
+  cat("\nMass parameter.")
+    p_alphas <- alpha_df %>%
+    pivot_longer(-c(Chain, Iteration), names_to = "Variable", values_to = "Value") %>%
     ggplot(aes(x = Value, fill = factor(Chain))) +
     geom_density(alpha = 0.3) +
     facet_wrap(~Variable, ncol = 1, scales = "free") +
@@ -245,32 +303,32 @@ if (plotting) {
       caption = "Dataset 1 is the cell cycle data, 2 is the RNA-seq data and 3 is the LOPIT data"
     )
 
-  ggsave(paste0(plot_dir, "sampled_alphas_across_chains_full.png"),
+
+  p_alphas_trace <- alpha_df %>%
+    pivot_longer(-c(Chain, Iteration), names_to = "Variable", values_to = "Value") %>%
+    ggplot(aes(x = Iteration, y = Value, colour = Chain)) +
+    geom_line() +
+    facet_wrap(~Variable, ncol = 1, scales = "free") +
+    ggthemes::scale_color_colorblind() +
+    labs(
+      title = "Sampled mass parameter across chains",
+      caption = "Dataset 1 is the cell cycle data, 2 is the RNA-seq data and 3 is the LOPIT data"
+    )
+
+  ggsave(paste0(plot_dir, "sampled_alpha_density.png"),
     plot = p_alphas,
     height = plot_height,
     width = plot_width
   )
 
-
-
-  p_phis_trace <- phi_df %>%
-    pivot_longer(-c(Chain, Iteration), names_to = "Variable", values_to = "Value") %>%
-    filter(Variable %in% c("Phi_12", "Phi_23")) %>%
-    ggplot(aes(x = Iteration, y = Value, colour = factor(Chain))) +
-    geom_line() +
-    facet_wrap(~Variable, ncol = 1, scales = "free") +
-    ggthemes::scale_fill_colorblind() +
-    labs(
-      title = "Sampled phis across chains",
-      caption = "Dataset 1 is the cell cycle data, 2 is the RNA-seq data and 3 is the LOPIT data"
-    )
-
-  ggsave(paste0(plot_dir, "sampled_phis_across_chains_trace.png"),
-    plot = p_phis_trace,
+  ggsave(paste0(plot_dir, "sampled_alpha_trace.png"),
+    plot = p_alphas_trace,
     height = plot_height,
     width = plot_width
   )
 
+
+  cat("\nPSMs.")
 
   p_cc_psm <- cell_cycle_psm_df |>
     ggplot(aes(x = x, y = y, fill = Entry)) +
@@ -310,7 +368,7 @@ if (plotting) {
     height = plot_height,
     width = plot_width
   )
-
+  
   # phi_df %>%
   #   pivot_longer(-c(Chain, Iteration), names_to = "Variable", values_to = "Value") %>%
   #   filter(Value < 50) %>%
@@ -510,6 +568,8 @@ if (plotting) {
 # )
 
 # === Cell cycle data ==========================================================
+
+cat("\n# === Investigate cell cycle data =======================================")
 
 microarray_data |> pheatmap::pheatmap(show_colnames = FALSE, show_rownames = FALSE, cluster_cols = FALSE)
 
