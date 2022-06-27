@@ -321,7 +321,7 @@ mean_absolute_difference <- vector("list", V)
 mean_absolute_difference_df <- NULL
 for (v in view_inds) {
   cms[[v]] <- vector("list", n_models)
-  predicted_partitionnumber_depthss[[v]] <- vector("list", n_models)
+  predicted_partitions[[v]] <- vector("list", n_models)
 }
 
 # Make CMs and compare across depths
