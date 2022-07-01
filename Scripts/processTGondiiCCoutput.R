@@ -309,8 +309,6 @@ fit_df$Depth <- factor(fit_df$Depth)
 phi_df$Depth <- factor(phi_df$Depth)
 mass_df$Depth <- factor(mass_df$Depth)
 
-
-
 cat("\nMaking consensus matrices.")
 
 # Now the assessing of consensus clustering
@@ -331,12 +329,10 @@ for (ii in seq(1, number_chains)) {
 
   for (jj in seq(1, number_depths)) {
     curr_d <- D_considered[jj]
-    comparison_d <- D_considered[jj - 1]
-
+    
     curr_cm_index <- which((models$Depth == curr_d) & (models$Width == curr_w)) # (ii - 1) * number_depths + jj
-    comparison_cm_index <- which(models$Depth == comparison_d & models$Width == curr_w)
     for (v in view_inds) {
-      .cm <- makePSM(allocations[[jj]][chains_used, , v])
+      .cm <- createSimilarityMat(matrix(allocations[[jj]][chains_used, , v], ncol = N))
       row.names(.cm) <- colnames(.cm) <- row.names(microarray_data)
       cms[[v]][[curr_cm_index]] <- .cm
 
@@ -349,6 +345,9 @@ for (ii in seq(1, number_chains)) {
       }
 
       if (jj > 1) {
+        comparison_d <- D_considered[jj - 1]
+        comparison_cm_index <- which((models$Depth == comparison_d) & (models$Width == curr_w))
+        
         # mean_absolute_difference[[v]] <-
         mad <- mean(abs(cms[[v]][[curr_cm_index]] - cms[[v]][[comparison_cm_index]]))
         mad_entry <- data.frame(
@@ -377,10 +376,10 @@ for (jj in seq(1, number_depths)) {
   curr_d <- D_considered[jj]
   for (ii in seq(2, number_chains)) {
     curr_w <- W_considered[ii]
-    comparison_w <- W_considered[ii - 1]
     chains_used <- seq(1, curr_w)
-    curr_cm_index <- which(models$Depth == curr_d && models$Width == curr_w) # (ii - 1) * number_depths + jj
-    comparison_cm_index <- which(models$Depth == curr_d && models$Width == comparison_w)
+    curr_cm_index <- which((models$Depth == curr_d & models$Width == curr_w)) # (ii - 1) * number_depths + jj
+    comparison_w <- W_considered[ii - 1]
+    comparison_cm_index <- which((models$Depth == curr_d) & (models$Width == comparison_w))
     for (v in view_inds) {
 
       # mean_absolute_difference[[v]] <-
