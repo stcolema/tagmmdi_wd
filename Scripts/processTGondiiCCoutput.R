@@ -151,6 +151,8 @@ K <- args$K # 125
 pattern <- paste0("(TGondiiMDI).*\\_K_", K, "_R_", R, ".rds$")
 # pattern <- paste0("(TGondii_RNAseq).*\\_K_", K, "_R_", R, "_type_G.rds$")
 
+output_file <- paste0(save_dir, "CC_R_", R, "_K_", K, ".rds")
+
 cat("\n=== Reading in files ===================================================")
 
 files <- list.files(model_output_dir,
@@ -541,3 +543,15 @@ if (plotting) {
     width = plot_width
   )
 }
+
+output <- list()
+output$classification_probability <- classification_probability[[n_models]]
+output$predicted_partitions <- vector("list", V)
+output$cms <- vector("list", V)
+for(v in view_inds) {
+  output$predicted_partitions[[v]] <- predicted_partitions[[v]][[n_models]]
+  output$cms[[v]] <- cms[[v]][[n_models]]
+}
+
+saveRDS(output, file = output_file)
+
