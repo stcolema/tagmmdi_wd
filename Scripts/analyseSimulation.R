@@ -306,6 +306,7 @@ ari_un_3 <- mcclust::arandi(new_un$pred[[3]], sim_cl$View_3)
 results_df <- data.frame(
   "Scenario" = rep(scn, V),
   "Index" = rep(index, V),
+  "View" =seq(1, V),
   "Semi-supservised" = c(ari_semi_1, ari_semi_2, ari_semi_3),
   "Unsupservised" = c(ari_un_1, ari_un_2, ari_un_3),
   "Difference" = c(
