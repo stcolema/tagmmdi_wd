@@ -31,7 +31,7 @@ findFusedGenesAcrossAllViews <- function(mcmc, threshold = 0.5) {
   fused_genes
 }
 
-out_dir <- "./MDITestData/Output/"
+out_dir <- "./MDITestData/Output/Unsupervised//"
 
 mditest1 <- read.csv("./MDITestData/MDItestdata1.csv", row.names = 1)
 mditest2 <- read.csv("./MDITestData/MDItestdata2.csv", row.names = 1)
@@ -39,7 +39,7 @@ mditest3 <- read.csv("./MDITestData/MDItestdata3.csv", row.names = 1)
 mditest4 <- read.csv("./MDITestData/MDItestdata4.csv", row.names = 1)
 gene_names <- row.names(mditest1)
 
-files <- list.files(out_dir, pattern = "mcmcMDItestdataSeed*", full.names = TRUE)[c(1, 6, 7)]
+files <- list.files(out_dir, pattern = "*rds", full.names = TRUE)
 n_files <- length(files)
 
 mcmc_out <- list()
@@ -80,10 +80,13 @@ phi_df |>
   facet_grid(Parameter~Chain, scales = "free_y")
 
 phi_df |> 
+  # filter(Chain == c(6, 8)) |> 
+  # filter(Chain == c(2, 3, 4, 6, 8, 9)) |> 
   pivot_longer(-Chain, names_to = "Parameter", values_to = "Sampled_value") |> 
   ggplot(aes(x = Sampled_value, fill = Parameter)) +
   geom_density() +
-  facet_grid(Chain ~ Parameter, scales = "free_y")
+  # xlim(c(0, 50)) +
+  facet_grid(Chain ~ Parameter, scales = "free")
 
 V <- mcmc_out[[1]]$V
 n_phis <- choose(V, 2)
@@ -109,11 +112,6 @@ fused_genes_2 <- findFusedGenesAcrossAllViews(mcmc_out[[2]])
 fused_genes_3 <- findFusedGenesAcrossAllViews(mcmc_out[[3]])
 
 mcmc_out[[1]]$predicted_clustering
-
-mditest1 <- read.csv("./MDITestData/MDItestdata1.csv", row.names = 1)
-mditest2 <- read.csv("./MDITestData/MDItestdata2.csv", row.names = 1)
-mditest3 <- read.csv("./MDITestData/MDItestdata3.csv", row.names = 1)
-mditest4 <- read.csv("./MDITestData/MDItestdata4.csv", row.names = 1)
 
 annotatedHeatmap(mditest1, mcmc_out[[1]]$predicted_clustering[[1]])
 annotatedHeatmap(mditest1, mcmc_out[[2]]$predicted_clustering[[1]])

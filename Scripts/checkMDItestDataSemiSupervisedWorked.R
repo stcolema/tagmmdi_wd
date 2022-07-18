@@ -5,6 +5,9 @@ library(tidyr)
 library(magrittr)
 library(mdiHelpR)
 library(pheatmap)
+library(patchwork)
+
+mdiHelpR::setMyTheme()
 
 annotatedData <- function(X, v, filename) {
   K_used <- 1
@@ -64,7 +67,7 @@ findFusedGenesAcrossAllViews <- function(mcmc, threshold = 0.5) {
   fused_genes
 }
 
-out_dir <- "./MDITestData/Output/"
+out_dir <- "./MDITestData/Output/Semisupervised///"
 
 mditest1 <- read.csv("./MDITestData/MDItestdata1.csv", row.names = 1)
 mditest2 <- read.csv("./MDITestData/MDItestdata2.csv", row.names = 1)
@@ -72,7 +75,7 @@ mditest3 <- read.csv("./MDITestData/MDItestdata3.csv", row.names = 1)
 mditest4 <- read.csv("./MDITestData/MDItestdata4.csv", row.names = 1)
 gene_names <- row.names(mditest1)
 
-files <- list.files(out_dir, pattern = "mcmcMDItestdataTestFrac08Seed*", full.names = TRUE)
+files <- list.files(out_dir, pattern = "*rds", full.names = TRUE)
 n_files <- length(files)
 
 mcmc_out <- list()
@@ -124,7 +127,82 @@ phi_df |>
 phi_df |> 
   pivot_longer(-Chain, names_to = "Parameter", values_to = "Sampled_value") |> 
   # dplyr::filter(Sampled_value < 30) |>  #, Parameter != "Phi_12") |>
-  dplyr::filter(Sampled_value < 30, Parameter != "Phi_12") |>
+  # dplyr::filter(Sampled_value < 30, Parameter != "Phi_12") |>
+  ggplot(aes(x = Sampled_value, fill = Parameter)) +
+  geom_density() +
+  facet_grid(Chain ~ Parameter, scales = "free")
+
+phi_12 <- phi_df |> 
+  pivot_longer(-Chain, names_to = "Parameter", values_to = "Sampled_value") |> 
+  dplyr::filter(Parameter == "Phi_12") |>
+  # dplyr::filter(Sampled_value < 30, Parameter != "Phi_12") |>
+  ggplot(aes(x = Sampled_value, group = Chain,)) +
+  geom_density(alpha = 0.3, fill = "#000000") +
+  facet_wrap(~Chain, ncol = 1, scales = "free_y") + 
+  labs(subtitle = expression(phi[12]))
+
+phi_13 <- phi_df |> 
+  pivot_longer(-Chain, names_to = "Parameter", values_to = "Sampled_value") |> 
+  dplyr::filter(Parameter == "Phi_13") |>
+  # dplyr::filter(Sampled_value < 30, Parameter != "Phi_12") |>
+  ggplot(aes(x = Sampled_value, group = Chain,)) +
+  geom_density(alpha = 0.3, fill = "#E69F00") +
+  facet_wrap(~Chain, ncol = 1, scales = "free_y") + 
+  labs(subtitle = expression(phi[13]))
+
+phi_14 <- phi_df |> 
+  pivot_longer(-Chain, names_to = "Parameter", values_to = "Sampled_value") |> 
+  dplyr::filter(Parameter == "Phi_14") |>
+  # dplyr::filter(Sampled_value < 30, Parameter != "Phi_12") |>
+  ggplot(aes(x = Sampled_value, group = Chain,)) +
+  geom_density(alpha = 0.3, fill = "#56B4E9") +
+  facet_wrap(~Chain, ncol = 1, scales = "free_y") + 
+  labs(subtitle = expression(phi[14]))
+
+phi_23 <- phi_df |> 
+  pivot_longer(-Chain, names_to = "Parameter", values_to = "Sampled_value") |> 
+  dplyr::filter(Parameter == "Phi_23") |>
+  # dplyr::filter(Sampled_value < 30, Parameter != "Phi_12") |>
+  ggplot(aes(x = Sampled_value, group = Chain,)) +
+  geom_density(alpha = 0.3, fill = "#009E73") +
+  facet_wrap(~Chain, ncol = 1, scales = "free_y") + 
+  labs(subtitle = expression(phi[23]))
+
+phi_24 <- phi_df |> 
+  pivot_longer(-Chain, names_to = "Parameter", values_to = "Sampled_value") |> 
+  dplyr::filter(Parameter == "Phi_24") |>
+  # dplyr::filter(Sampled_value < 30, Parameter != "Phi_12") |>
+  ggplot(aes(x = Sampled_value, group = Chain,)) +
+  geom_density(alpha = 0.3, fill = "#F0E442") +
+  facet_wrap(~Chain, ncol = 1, scales = "free_y") + 
+  labs(subtitle = expression(phi[24]))
+
+phi_34 <- phi_df |> 
+  pivot_longer(-Chain, names_to = "Parameter", values_to = "Sampled_value") |> 
+  dplyr::filter(Parameter == "Phi_34") |>
+  # dplyr::filter(Sampled_value < 30, Parameter != "Phi_12") |>
+  ggplot(aes(x = Sampled_value, group = Chain,)) +
+  geom_density(alpha = 0.3, fill = "#0072B2") +
+  facet_wrap(~Chain, ncol = 1, scales = "free_y") + 
+  labs(subtitle = expression(phi[34]))
+
+phi_12 + phi_13 + phi_14 + phi_23 + phi_24 + phi_34 +
+  plot_annotation(title = "Sampled phi values across chains")
+ggsave("./Sampled_phi_values_across_chains_semisupervised.png", width = 16, height = 11)
+
+
+phi_df |> 
+  pivot_longer(-Chain, names_to = "Parameter", values_to = "Sampled_value") |> 
+  # dplyr::filter(Sampled_value < 30, Parameter != "Phi_12") |>
+  dplyr::filter(Chain %in% c(1, 5, 7)) |>
+  ggplot(aes(x = Sampled_value, fill = Parameter)) +
+  geom_density() +
+  facet_grid(Parameter~Chain, scales = "free_y")
+
+phi_df |> 
+  pivot_longer(-Chain, names_to = "Parameter", values_to = "Sampled_value") |> 
+  # dplyr::filter(Sampled_value < 30) |>  #, Parameter != "Phi_12") |>
+  dplyr::filter(Chain %in% c(1, 5, 7)) |>
   ggplot(aes(x = Sampled_value, fill = Parameter)) +
   geom_density() +
   facet_grid(Chain ~ Parameter, scales = "free_y")
@@ -151,13 +229,6 @@ boxplot(phi_medians)
 fused_genes_1 <- findFusedGenesAcrossAllViews(mcmc_out[[1]])
 fused_genes_2 <- findFusedGenesAcrossAllViews(mcmc_out[[2]])
 fused_genes_3 <- findFusedGenesAcrossAllViews(mcmc_out[[3]])
-
-mcmc_out[[1]]$predicted_clustering
-
-mditest1 <- read.csv("./MDITestData/MDItestdata1.csv", row.names = 1)
-mditest2 <- read.csv("./MDITestData/MDItestdata2.csv", row.names = 1)
-mditest3 <- read.csv("./MDITestData/MDItestdata3.csv", row.names = 1)
-mditest4 <- read.csv("./MDITestData/MDItestdata4.csv", row.names = 1)
 
 K_used <- 1
 for(ii in seq(1, n_files)) {
