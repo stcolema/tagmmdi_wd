@@ -26,24 +26,24 @@ multiClassF1 <- function(pred, truth) {
   if (mismatch_in_lengths) {
     stop("Prediction vector and truth must be of the same length.")
   }
-  
+
   # Confusion matrix for current fold
   conf <- caret::confusionMatrix(
     data = pred,
     reference = truth
   )$table
-  
+
   # conf <- t( get.confusion_matrix(
-  #   truth = truth, 
+  #   truth = truth,
   #   predicted = pred
   # ) )
-  
+
   N <- length(pred)
   n_levels <- ncol(conf)
   seq_levels <- seq(1, n_levels)
-  
+
   f1 <- rep(0, n_levels)
-  
+
   for (ii in seq_levels) {
     precision <- conf[ii, ii] / sum(conf[ii, ])
     recall <- conf[ii, ii] / sum(conf[, ii])
@@ -52,7 +52,7 @@ multiClassF1 <- function(pred, truth) {
       f1[ii] <- 0
     }
   }
-  
+
   macro_f1 <- mean(f1)
   weighted_f1 <- sum(f1 * colSums(conf)) / N
   accuracy <- sum(pred == truth, na.rm = TRUE) / N
@@ -64,7 +64,7 @@ multiClassF1 <- function(pred, truth) {
   )
 }
 
-  
+
 
 makePhiDF <- function(mcmc) {
   n_phis <- choose(mcmc$V, 2)
@@ -257,28 +257,27 @@ new_semi <- predictFromMultipleChains(mcmc_semi, burn)
 new_un <- predictFromMultipleChains(mcmc_un, burn)
 psms_un <- psms_semi <- list()
 K_pred_un <- K_pred_semi <- c()
-for(v in seq(1, V)) {
+for (v in seq(1, V)) {
   psms_semi[[v]] <- createSimilarityMat(new_semi$allocations[[v]])
   psms_un[[v]] <- createSimilarityMat(new_un$allocations[[v]])
-  
+
   .cl_semi <- maxpear(psms_semi[[v]])$cl
   .cl_un <- maxpear(psms_un[[v]])$cl
-  
+
   K_pred_semi[v] <- .k_semi <- length(unique(.cl_semi))
   K_pred_un[v] <- .k_un <- length(unique(.cl_un))
-  
+
   k_true <- length(unique(sim_cl[[v]]))
-  
-  if(.k_semi < k_true) {
+
+  if (.k_semi < k_true) {
     K_pred_semi[v] <- k_true
   }
-  if(.k_un < k_true) {
+  if (.k_un < k_true) {
     K_pred_un[v] <- k_true
   }
-  
+
   new_semi$pred[[v]] <- factor(.cl_semi, levels = seq(1, K_pred_semi[v]))
   new_un$pred[[v]] <- factor(.cl_un, levels = seq(1, K_pred_un[v]))
-  
 }
 
 new_semi$psms <- psms_semi
@@ -286,10 +285,10 @@ new_un$psms <- psms_un
 
 # multiClassF1(new_semi$pred[[1]], factor(sim_cl$View_1, levels = seq(1, K_pred_semi[1])))
 # multiClassF1(new_un$pred[[1]], factor(sim_cl$View_1, levels = seq(1, K_pred_un[1])))
-# 
+#
 # multiClassF1(new_semi$pred[[2]], factor(sim_cl$View_2, levels = seq(1, K_pred_semi[2])))
 # multiClassF1(new_un$pred[[2]], factor(sim_cl$View_2, levels = seq(1, K_pred_un[2])))
-# 
+#
 # multiClassF1(new_semi$pred[[3]], factor(sim_cl$View_3, levels = seq(1, K_pred_semi[3])))
 # multiClassF1(new_un$pred[[3]], factor(sim_cl$View_3, levels = seq(1, K_pred_un[3])))
 
@@ -304,13 +303,19 @@ ari_un_2 <- mcclust::arandi(new_un$pred[[2]], sim_cl$View_2)
 ari_semi_3 <- mcclust::arandi(new_semi$pred[[3]], sim_cl$View_3)
 ari_un_3 <- mcclust::arandi(new_un$pred[[3]], sim_cl$View_3)
 
-results_df <- data.frame("Scenario" = rep(scn, V), 
+results_df <- data.frame(
+  "Scenario" = rep(scn, V),
   "Index" = rep(index, V),
-  "Semi-supservised" = c(ari_semi_1, ari_semi_2, ari_semi_3), 
-  "Unsupservised" = c(ari_un_1, ari_un_2, ari_un_3)
+  "Semi-supservised" = c(ari_semi_1, ari_semi_2, ari_semi_3),
+  "Unsupservised" = c(ari_un_1, ari_un_2, ari_un_3),
+  "Difference" = c(
+    ari_semi_1 - ari_un_1,
+    ari_semi_2 - ari_un_2, ari_semi_3 - ari_un_3
+  )
 )
 
-cat("\nSave results.")
+cat("\nSave results\n.")
+knitr::kable(results_df, digits = 3)
 
 out_lst <- list(
   "MCMC" = list(
@@ -323,4 +328,3 @@ out_lst <- list(
 saveRDS(out_lst, save_file)
 
 cat("\n# === SCRIPT COMPLETE ================================================\n")
-
