@@ -13,7 +13,7 @@ library(optparse)
 setMyTheme()
 sim_col_pal <- simColPal()
 
-data_dir <- "./Results/CV_output/"
+data_dir <- "./KNN_TL_comp/"
 fracs <- c(10, 30, 50)
 datasets <- c("E14TG2aS1", "groen2014r1", "dunkley2006", "HEK293T2011")
 result_df <- NULL
@@ -92,7 +92,7 @@ result_df$Dataset <- factor(result_df$Dataset,
 
 result_df$Model <- factor(result_df$Model, 
   labels = c("MDI", "TAGM", "TL"),
-  levels = c("TAGM", "MDI", "KNN_TL")
+  levels = c("MDI", "TAGM", "KNN_TL")
 )
 
 long_result_df <- result_df %>%

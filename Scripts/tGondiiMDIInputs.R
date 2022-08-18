@@ -296,7 +296,7 @@ rna_reducced_mat <- rna_mat[genes_in_protein_data_ind, ]
 microarray_reduced_mat <- microarray_mat[genes_in_protein_data_ind, ]
 
 protein_lst_red <- protein_lst
-protein_lst_red$X <- protein_lst$X[proteins_in_rna_data_ind, ]
+protein_lst_red$X <- scale(protein_lst$X[proteins_in_rna_data_ind, ])
 protein_lst_red$fixed <- protein_lst$fixed[proteins_in_rna_data_ind, , drop = FALSE]
 protein_lst_red$initial_labels <- protein_lst$initial_labels[proteins_in_rna_data_ind, , drop = FALSE]
 # protein_lst$class_key <- protein_lst$X[proteins_in_rna_data_ind, ]
@@ -396,6 +396,23 @@ K <- c(
   n_clust_unsupervised,
   length(pRoloc::getMarkerClasses(Barylyuk2020ToxoLopit))
 )
+
+train_inds <- which( final_protein_df$Fixed == 1)
+row_order <- findOrder(protein_mat[ train_inds, ])
+p_gg <- prepDataForggHeatmap(protein_mat[train_inds, ], row_order = row_order)
+rna_gg <- prepDataForggHeatmap(normalised_rnaseq_macrophages_infected_by_T_gondii[train_inds, ], row_order = row_order)
+microarray_gg <- prepDataForggHeatmap(m_white_cell_cycle_normalised[train_inds, ], row_order = row_order)
+
+p_gg$Dataset <- "hyperLOPIT"
+rna_gg$Dataset <- "Murine macrophages"
+microarray_gg$Dataset <- "Cell-cycle"
+
+gg_df <- rbind(p_gg, microarray_gg, rna_gg)
+p_heatmap_comparison <- gg_df |> 
+  ggplot(aes(x = x, y = y, fill = Entry)) +
+  geom_tile() + 
+  facet_wrap(~Dataset, scales = "free_x") + 
+  scale_fill_gradient2(mid = "#FFFFFF", low = "#146EB4", high = "#FF9900")
 
 cat("\n\n=== INPUT PREPARED ================================================\n")
 

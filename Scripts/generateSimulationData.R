@@ -111,6 +111,32 @@ generateViewGivenStructure <- function(generating_structure, frac_present, P, K,
 }
 
 
+generateMDIDataLabels <- function(N, V, K, gammas, phis) {
+  
+  N_inds <- seq(1, N)
+  V_inds <- seq(1, V)
+  
+  labels <- matrix(0, N, V)
+  
+  for(n in seq(1, N)) {
+    for(v in seq(1, V)) {
+      V_comp_inds <- V_inds[-v]
+      comps <- seq(1, K[v])
+      weights <- gammas[, v]
+      if(v > 1) {
+        for(w in seq(1, v - 1)) {
+          label_in_view_w <- labels[n, w]
+          weights[label_in_view_w] <- weights[label_in_view_w] * (1.0 + phis[v, w])
+        }
+      }
+      weights <- weights / sum(weights)
+      labels[n, v] <- sample(comps, prob = weights, size = 1)
+    }
+  }
+  labels
+}
+
+
 input_arguments <- function() {
   option_list <- list(
 
@@ -185,8 +211,8 @@ for (n in seq(1, n_datasets)) {
   # Parameters for view 1
   group_means <- rnorm(K_1, sd = 1.75)
   group_sds <- rgamma(K_1, 4, 2)
-  group_dfs <- c(4, 10, 20, 50, 10, 20, 20)
-  group_weights <- c(0.3, 0.2, 0.1, rep(0.4 / 4, 4))
+  group_dfs <- c(5, 10, 5, 5, 10, 5, 20)
+  group_weights <- c(0.25, 0.2, 0.15, rep(0.4 / 4, 4))
 
   # If each cluster is generated from a mixture these come into play
   B <- 3

@@ -67,7 +67,7 @@ findFusedGenesAcrossAllViews <- function(mcmc, threshold = 0.5) {
   fused_genes
 }
 
-out_dir <- "./MDITestData/Output/Semisupervised///"
+out_dir <- "./MDITestData/Output/UnsupervisedNaive/"
 
 mditest1 <- read.csv("./MDITestData/MDItestdata1.csv", row.names = 1)
 mditest2 <- read.csv("./MDITestData/MDItestdata2.csv", row.names = 1)
@@ -75,11 +75,43 @@ mditest3 <- read.csv("./MDITestData/MDItestdata3.csv", row.names = 1)
 mditest4 <- read.csv("./MDITestData/MDItestdata4.csv", row.names = 1)
 gene_names <- row.names(mditest1)
 
+
+row_order1 <- findOrder(mditest1)
+row_order2 <- findOrder(mditest2)
+row_order3 <- findOrder(mditest3)
+row_order4 <- findOrder(mditest4)
+
+
+labels <- c(
+  rep(1, 15),
+  rep(2, 35),
+  rep(3, 6),
+  rep(4, 8),
+  rep(5, 11),
+  rep(6, 8),
+  rep(7, 17)
+)
+
+labels2a <- c(
+  rep(1, 15),
+  rep(4, 8),
+  rep(3, 6),
+  rep(5, 11),
+  rep(6, 8),
+  rep(7, 17),
+  rep(2, 35)
+)
+
+labels2 <- labels2a[match(row.names(mditest2), row.names(mditest2[row_order2, ]))]
+labels3 <- labels2a[match(row.names(mditest3), row.names(mditest3[row_order3, ]))]
+labels4 <- labels2a[match(row.names(mditest4), row.names(mditest4[row_order4, ]))]
+
+
 files <- list.files(out_dir, pattern = "*rds", full.names = TRUE)
 n_files <- length(files)
 
 mcmc_out <- list()
-burn <- 2e4
+burn <- 5000
 
 psms <- vector("list", 4)
 
@@ -109,9 +141,50 @@ for(ii in seq(1, n_files)) {
   }
 }
 
+across_chain <- predictFromMultipleChains(mcmc_out, burn = 0, chains_already_processed = T)
+across_chain$psm <- list()
+across_chain$psm[[1]] <- mdiHelpR::createSimilarityMat(across_chain$allocations[[1]]) |> 
+  set_rownames(gene_names)
+across_chain$psm[[2]] <- mdiHelpR::createSimilarityMat(across_chain$allocations[[2]]) |> 
+  set_rownames(gene_names)
+across_chain$psm[[3]] <- mdiHelpR::createSimilarityMat(across_chain$allocations[[3]]) |> 
+  set_rownames(gene_names)
+across_chain$psm[[4]] <- mdiHelpR::createSimilarityMat(across_chain$allocations[[4]]) |> 
+  set_rownames(gene_names)
+
+annotatedHeatmap(across_chain$psm[[1]], labels, 
+                 main = "Across chain PSM view 1 annotated by true labels",
+                 col_pal = simColPal(), 
+                 my_breaks = defineBreaks(simColPal(), lb = 0))
+annotatedHeatmap(across_chain$psm[[2]], labels2,
+                 main = "Across chain PSM view 2 annotated by true labels",
+                 col_pal = simColPal(), 
+                 my_breaks = defineBreaks(simColPal(), lb = 0))
+annotatedHeatmap(across_chain$psm[[3]], labels3, 
+                 main = "Across chain PSM view 3 annotated by true labels",
+                 col_pal = simColPal(), 
+                 my_breaks = defineBreaks(simColPal(), lb = 0))
+annotatedHeatmap(across_chain$psm[[4]], labels4, 
+                 main = "Across chain PSM view 4 annotated by true labels",
+                 col_pal = simColPal(), 
+                 my_breaks = defineBreaks(simColPal(), lb = 0))
+
+across_chain$phis |> boxplot(main = "Sampled phis across 8 chains")
+
+across_chain$phis |> 
+  as.data.frame() |> 
+  pivot_longer(everything(), names_to = "Parameter", values_to = "Sampled_value") |> 
+  # dplyr::filter(Chain == 9, Sampled_value < 125) |> 
+  ggplot(aes(x = Sampled_value, y = Parameter, fill = Parameter)) +
+  geom_boxplot()
+# +
+  # facet_wrap(~Parameter, scales = "free_y")
+
+across_chain_psm_df <- tagmReDraft::prepSimilarityMatricesForGGplot(across_chain$psm, ylim = c(0, 40))
+
 phi_df |> 
   pivot_longer(-Chain, names_to = "Parameter", values_to = "Sampled_value") |> 
-  dplyr::filter(Chain == 9, Sampled_value < 125) |> 
+  # dplyr::filter(Chain == 9, Sampled_value < 125) |> 
   ggplot(aes(x = Sampled_value, fill = Parameter)) +
   geom_density() +
   facet_grid(Parameter~Chain, scales = "free_y")
@@ -132,69 +205,69 @@ phi_df |>
   geom_density() +
   facet_grid(Chain ~ Parameter, scales = "free")
 
-phi_12 <- phi_df |> 
-  pivot_longer(-Chain, names_to = "Parameter", values_to = "Sampled_value") |> 
-  dplyr::filter(Parameter == "Phi_12") |>
-  # dplyr::filter(Sampled_value < 30, Parameter != "Phi_12") |>
-  ggplot(aes(x = Sampled_value, group = Chain,)) +
-  geom_density(alpha = 0.3, fill = "#000000") +
-  facet_wrap(~Chain, ncol = 1, scales = "free_y") + 
-  labs(subtitle = expression(phi[12]))
-
-phi_13 <- phi_df |> 
-  pivot_longer(-Chain, names_to = "Parameter", values_to = "Sampled_value") |> 
-  dplyr::filter(Parameter == "Phi_13") |>
-  # dplyr::filter(Sampled_value < 30, Parameter != "Phi_12") |>
-  ggplot(aes(x = Sampled_value, group = Chain,)) +
-  geom_density(alpha = 0.3, fill = "#E69F00") +
-  facet_wrap(~Chain, ncol = 1, scales = "free_y") + 
-  labs(subtitle = expression(phi[13]))
-
-phi_14 <- phi_df |> 
-  pivot_longer(-Chain, names_to = "Parameter", values_to = "Sampled_value") |> 
-  dplyr::filter(Parameter == "Phi_14") |>
-  # dplyr::filter(Sampled_value < 30, Parameter != "Phi_12") |>
-  ggplot(aes(x = Sampled_value, group = Chain,)) +
-  geom_density(alpha = 0.3, fill = "#56B4E9") +
-  facet_wrap(~Chain, ncol = 1, scales = "free_y") + 
-  labs(subtitle = expression(phi[14]))
-
-phi_23 <- phi_df |> 
-  pivot_longer(-Chain, names_to = "Parameter", values_to = "Sampled_value") |> 
-  dplyr::filter(Parameter == "Phi_23") |>
-  # dplyr::filter(Sampled_value < 30, Parameter != "Phi_12") |>
-  ggplot(aes(x = Sampled_value, group = Chain,)) +
-  geom_density(alpha = 0.3, fill = "#009E73") +
-  facet_wrap(~Chain, ncol = 1, scales = "free_y") + 
-  labs(subtitle = expression(phi[23]))
-
-phi_24 <- phi_df |> 
-  pivot_longer(-Chain, names_to = "Parameter", values_to = "Sampled_value") |> 
-  dplyr::filter(Parameter == "Phi_24") |>
-  # dplyr::filter(Sampled_value < 30, Parameter != "Phi_12") |>
-  ggplot(aes(x = Sampled_value, group = Chain,)) +
-  geom_density(alpha = 0.3, fill = "#F0E442") +
-  facet_wrap(~Chain, ncol = 1, scales = "free_y") + 
-  labs(subtitle = expression(phi[24]))
-
-phi_34 <- phi_df |> 
-  pivot_longer(-Chain, names_to = "Parameter", values_to = "Sampled_value") |> 
-  dplyr::filter(Parameter == "Phi_34") |>
-  # dplyr::filter(Sampled_value < 30, Parameter != "Phi_12") |>
-  ggplot(aes(x = Sampled_value, group = Chain,)) +
-  geom_density(alpha = 0.3, fill = "#0072B2") +
-  facet_wrap(~Chain, ncol = 1, scales = "free_y") + 
-  labs(subtitle = expression(phi[34]))
-
-phi_12 + phi_13 + phi_14 + phi_23 + phi_24 + phi_34 +
-  plot_annotation(title = "Sampled phi values across chains")
-ggsave("./Sampled_phi_values_across_chains_semisupervised.png", width = 16, height = 11)
+# phi_12 <- phi_df |> 
+#   pivot_longer(-Chain, names_to = "Parameter", values_to = "Sampled_value") |> 
+#   dplyr::filter(Parameter == "Phi_12") |>
+#   # dplyr::filter(Sampled_value < 30, Parameter != "Phi_12") |>
+#   ggplot(aes(x = Sampled_value, group = Chain,)) +
+#   geom_density(alpha = 0.3, fill = "#000000") +
+#   facet_wrap(~Chain, ncol = 1, scales = "free_y") + 
+#   labs(subtitle = expression(phi[12]))
+# 
+# phi_13 <- phi_df |> 
+#   pivot_longer(-Chain, names_to = "Parameter", values_to = "Sampled_value") |> 
+#   dplyr::filter(Parameter == "Phi_13") |>
+#   # dplyr::filter(Sampled_value < 30, Parameter != "Phi_12") |>
+#   ggplot(aes(x = Sampled_value, group = Chain,)) +
+#   geom_density(alpha = 0.3, fill = "#E69F00") +
+#   facet_wrap(~Chain, ncol = 1, scales = "free_y") + 
+#   labs(subtitle = expression(phi[13]))
+# 
+# phi_14 <- phi_df |> 
+#   pivot_longer(-Chain, names_to = "Parameter", values_to = "Sampled_value") |> 
+#   dplyr::filter(Parameter == "Phi_14") |>
+#   # dplyr::filter(Sampled_value < 30, Parameter != "Phi_12") |>
+#   ggplot(aes(x = Sampled_value, group = Chain,)) +
+#   geom_density(alpha = 0.3, fill = "#56B4E9") +
+#   facet_wrap(~Chain, ncol = 1, scales = "free_y") + 
+#   labs(subtitle = expression(phi[14]))
+# 
+# phi_23 <- phi_df |> 
+#   pivot_longer(-Chain, names_to = "Parameter", values_to = "Sampled_value") |> 
+#   dplyr::filter(Parameter == "Phi_23") |>
+#   # dplyr::filter(Sampled_value < 30, Parameter != "Phi_12") |>
+#   ggplot(aes(x = Sampled_value, group = Chain,)) +
+#   geom_density(alpha = 0.3, fill = "#009E73") +
+#   facet_wrap(~Chain, ncol = 1, scales = "free_y") + 
+#   labs(subtitle = expression(phi[23]))
+# 
+# phi_24 <- phi_df |> 
+#   pivot_longer(-Chain, names_to = "Parameter", values_to = "Sampled_value") |> 
+#   dplyr::filter(Parameter == "Phi_24") |>
+#   # dplyr::filter(Sampled_value < 30, Parameter != "Phi_12") |>
+#   ggplot(aes(x = Sampled_value, group = Chain,)) +
+#   geom_density(alpha = 0.3, fill = "#F0E442") +
+#   facet_wrap(~Chain, ncol = 1, scales = "free_y") + 
+#   labs(subtitle = expression(phi[24]))
+# 
+# phi_34 <- phi_df |> 
+#   pivot_longer(-Chain, names_to = "Parameter", values_to = "Sampled_value") |> 
+#   dplyr::filter(Parameter == "Phi_34") |>
+#   # dplyr::filter(Sampled_value < 30, Parameter != "Phi_12") |>
+#   ggplot(aes(x = Sampled_value, group = Chain,)) +
+#   geom_density(alpha = 0.3, fill = "#0072B2") +
+#   facet_wrap(~Chain, ncol = 1, scales = "free_y") + 
+#   labs(subtitle = expression(phi[34]))
+# 
+# phi_12 + phi_13 + phi_14 + phi_23 + phi_24 + phi_34 +
+#   plot_annotation(title = "Sampled phi values across chains")
+# ggsave("./Sampled_phi_values_across_chains_semisupervised.png", width = 16, height = 11)
 
 
 phi_df |> 
   pivot_longer(-Chain, names_to = "Parameter", values_to = "Sampled_value") |> 
   # dplyr::filter(Sampled_value < 30, Parameter != "Phi_12") |>
-  dplyr::filter(Chain %in% c(1, 5, 7)) |>
+  # dplyr::filter(Chain %in% c(1, 5, 7)) |>
   ggplot(aes(x = Sampled_value, fill = Parameter)) +
   geom_density() +
   facet_grid(Parameter~Chain, scales = "free_y")
@@ -202,13 +275,34 @@ phi_df |>
 phi_df |> 
   pivot_longer(-Chain, names_to = "Parameter", values_to = "Sampled_value") |> 
   # dplyr::filter(Sampled_value < 30) |>  #, Parameter != "Phi_12") |>
-  dplyr::filter(Chain %in% c(1, 5, 7)) |>
+  # dplyr::filter(Chain %in% c(1, 5, 7)) |>
   ggplot(aes(x = Sampled_value, fill = Parameter)) +
   geom_density() +
   facet_grid(Chain ~ Parameter, scales = "free_y")
 
+phi_df |> 
+  pivot_longer(-Chain, names_to = "Parameter", values_to = "Sampled_value") |> 
+  # dplyr::filter(Sampled_value < 30) |>  #, Parameter != "Phi_12") |>
+  # dplyr::filter(Chain %in% c(1, 5, 7)) |>
+  ggplot(aes(x = Sampled_value, y = Parameter, fill = Parameter)) +
+  geom_boxplot() +
+  facet_wrap(~ Chain, labeller = label_both)
+
+phi_df |> 
+  pivot_longer(-Chain, names_to = "Parameter", values_to = "Sampled_value") |> 
+  # dplyr::filter(Sampled_value < 30) |>  #, Parameter != "Phi_12") |>
+  # dplyr::filter(Chain %in% c(1, 5, 7)) |>
+  ggplot(aes(x = Sampled_value, y = Parameter, fill = Parameter)) +
+  geom_boxplot() +
+  facet_wrap(~ Chain, labeller = label_both) +
+  coord_cartesian(xlim=c(0, 2.5))
+
+# ggsave("../Phi_naive_calc.png")
+# 
 V <- mcmc_out[[1]]$V
 n_phis <- choose(V, 2)
+
+
 
 phi_medians <- lapply(mcmc_out, function(x) apply(x$phis, 2, median)) |> 
   unlist() |> 
@@ -302,6 +396,20 @@ psm_df |>
   ggplot(aes(x = x, y= y, fill = Entry)) + 
   geom_tile() + 
   facet_grid(View~Chain, labeller = label_both) + 
+  scale_fill_gradient(low = "#FFFFFF", high = "#146EB4") +
+  theme(axis.title = element_blank(), 
+        axis.text = element_blank(), 
+        axis.line = element_blank(),
+        axis.ticks = element_blank(), 
+        panel.grid = element_blank(),
+        panel.background = element_rect(fill = "#FDF9DC", colour = "#FDF9DC")
+  )
+
+across_chain_psm_df$View <- across_chain_psm_df$Chain
+across_chain_psm_df |> 
+  ggplot(aes(x = x, y= y, fill = Entry)) + 
+  geom_tile() + 
+  facet_wrap(~View, labeller = label_both) + 
   scale_fill_gradient(low = "#FFFFFF", high = "#146EB4") +
   theme(axis.title = element_blank(), 
         axis.text = element_blank(), 

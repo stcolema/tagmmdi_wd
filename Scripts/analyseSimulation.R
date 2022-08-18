@@ -122,11 +122,13 @@ input_arguments <- function() {
     optparse::make_option(c("-K", "--K"),
       type = "numeric",
       default = 50,
-      help = paste(
-        "Number of components modelled in each dataset. If a dataset is",
-        "semi-supervised then the number of unique labels is modelled, if",
-        "unsupervised we default to 50."
-      ),
+      help = "Number of components modelled in the semi-supervised dataset.",
+      metavar = "numeric"
+    ),
+    optparse::make_option(c("--n_clust_unsupervised"),
+      type = "numeric",
+      default = 50L,
+      help = "Number of components modelled in each unsupervised dataset.",
       metavar = "numeric"
     ),
     optparse::make_option(c("--test_frac"),
@@ -162,9 +164,12 @@ input_arguments <- function() {
 
 cat("\n# === SIMULATION DATA GENERATION =====================================\n")
 
+t0 <- Sys.time()
+
 cat("\nRead in arguments.")
 set.seed(1)
 mdiHelpR::setMyTheme()
+RcppParallel::setThreadOptions()
 
 # Pass the inputs from the command line
 args <- input_arguments()
@@ -194,12 +199,12 @@ n_chains <- args$n_chains
 K <- args$K
 
 # Number of clusters modelled in the unsupervised views
-n_clust_unsupervised <- 50
+n_clust_unsupervised <- args$n_clust_unsupervised
 
 # Input and output files
 sim_data_file <- paste0(data_dir, "dataset_", index, ".rds")
 test_perc <- test_frac * 100
-save_file <- paste0(save_dir, "dataset_", index, "_testFrac_", test_perc, "_nChains_", n_chains, "_K_", K, ".png")
+save_file <- paste0(save_dir, "dataset_", index, "_testFrac_", test_perc, "_nChains_", n_chains, "_K_", K, "_kUnsupservised_", n_clust_unsupervised, ".rds")
 
 cat("\n Arguments passed. Reading in data.")
 
@@ -250,23 +255,55 @@ mcmc_un <- tagmReDraft::runMCMCChains(X, n_chains,
   initial_labels = initial_labels
 )
 
+cat("\nMixture models.")
+mcmc_mix <- list()
+for(v in seq(1, V)) {
+  mcmc_mix[[v]] <- tagmReDraft::runMCMCChains(X[v], n_chains,
+    R = R,
+    thin = thin,
+    types = types[v],
+    K = K_max[v],
+    fixed = fixed[, v, drop = FALSE],
+    initial_labels = initial_labels[, v, drop = FALSE]
+  )
+  # mcmc_mix[[v]] <- list()
+  # for(ii in seq(1, n_chains)) {
+  #   mcmc_mix[[v]][[i]] <- tagmReDraft::callMixtureModel(X[[v]], R, thin, types[v],
+  #     K = K[v], 
+  #     initial_labels = initial_labels[, v],
+  #     fixed = fixed[, v]
+  #   )
+  #   mcmc_mix[[v]][[i]]$Chain <- ii
+  # }
+}
+
 cat("\n# === MODELLING COMPLETE =============================================\n")
 
 cat("\nProcess output.")
-new_semi <- predictFromMultipleChains(mcmc_semi, burn)
-new_un <- predictFromMultipleChains(mcmc_un, burn)
-psms_un <- psms_semi <- list()
-K_pred_un <- K_pred_semi <- c()
+new_semi <- predictFromMultipleChains(mcmc_semi, burn, construct_psm = FALSE)
+new_un <- predictFromMultipleChains(mcmc_un, burn, construct_psm = FALSE)
+
+new_mix <- list()
+for(v in seq(1, V)) {
+  new_mix[[v]] <- predictFromMultipleChains(mcmc_mix[[v]], burn, construct_psm = FALSE)
+}
+
+psms_un <- psms_semi <- psms_mix <- list()
+K_pred_un <- K_pred_semi <- K_pred_mix <- c()
+
 for (v in seq(1, V)) {
   psms_semi[[v]] <- createSimilarityMat(new_semi$allocations[[v]])
   psms_un[[v]] <- createSimilarityMat(new_un$allocations[[v]])
-
-  .cl_semi <- maxpear(psms_semi[[v]])$cl
-  .cl_un <- maxpear(psms_un[[v]])$cl
+  psms_mix[[v]] <- createSimilarityMat(new_mix[[v]]$allocations[[1]])
+  
+  .cl_semi <- mcclust::maxpear(psms_semi[[v]])$cl
+  .cl_un <- mcclust::maxpear(psms_un[[v]])$cl
+  .cl_mix <- mcclust::maxpear(psms_mix[[v]])$cl
 
   K_pred_semi[v] <- .k_semi <- length(unique(.cl_semi))
   K_pred_un[v] <- .k_un <- length(unique(.cl_un))
-
+  K_pred_mix[v] <- .k_mix <- length(unique(.cl_mix))
+  
   k_true <- length(unique(sim_cl[[v]]))
 
   if (.k_semi < k_true) {
@@ -275,13 +312,18 @@ for (v in seq(1, V)) {
   if (.k_un < k_true) {
     K_pred_un[v] <- k_true
   }
-
+  if (.k_mix < k_true) {
+    K_pred_mix[v] <- .k_mix
+  }
+  
   new_semi$pred[[v]] <- factor(.cl_semi, levels = seq(1, K_pred_semi[v]))
   new_un$pred[[v]] <- factor(.cl_un, levels = seq(1, K_pred_un[v]))
+  new_mix[[v]]$pred[[1]] <- factor(.cl_mix, levels = seq(1, K_pred_mix[v]))
 }
 
 new_semi$psms <- psms_semi
 new_un$psms <- psms_un
+new_mix$psms <- psms_mix
 
 # multiClassF1(new_semi$pred[[1]], factor(sim_cl$View_1, levels = seq(1, K_pred_semi[1])))
 # multiClassF1(new_un$pred[[1]], factor(sim_cl$View_1, levels = seq(1, K_pred_un[1])))
@@ -296,22 +338,32 @@ cat("\nCompare to truth using the adjusted rand index.")
 
 ari_semi_1 <- mcclust::arandi(new_semi$pred[[1]][test_inds], sim_cl$View_1[test_inds])
 ari_un_1 <- mcclust::arandi(new_un$pred[[1]][test_inds], sim_cl$View_1[test_inds])
+ari_mix_1 <- mcclust::arandi(new_mix[[1]]$pred[[1]][test_inds], sim_cl$View_1[test_inds])
 
 ari_semi_2 <- mcclust::arandi(new_semi$pred[[2]], sim_cl$View_2)
 ari_un_2 <- mcclust::arandi(new_un$pred[[2]], sim_cl$View_2)
+ari_mix_2 <- mcclust::arandi(new_mix[[2]]$pred[[1]], sim_cl$View_2)
 
 ari_semi_3 <- mcclust::arandi(new_semi$pred[[3]], sim_cl$View_3)
 ari_un_3 <- mcclust::arandi(new_un$pred[[3]], sim_cl$View_3)
+ari_mix_3 <- mcclust::arandi(new_mix[[3]]$pred[[1]], sim_cl$View_3)
 
 results_df <- data.frame(
   "Scenario" = rep(scn, V),
   "Index" = rep(index, V),
-  "View" =seq(1, V),
+  "View" = seq(1, V),
   "Semi-supservised" = c(ari_semi_1, ari_semi_2, ari_semi_3),
   "Unsupservised" = c(ari_un_1, ari_un_2, ari_un_3),
-  "Difference" = c(
+  "Mixture_model"= c(ari_mix_1, ari_mix_2, ari_mix_3),
+  "Difference_unsupervised" = c(
     ari_semi_1 - ari_un_1,
-    ari_semi_2 - ari_un_2, ari_semi_3 - ari_un_3
+    ari_semi_2 - ari_un_2, 
+    ari_semi_3 - ari_un_3
+  ),
+  "Difference_mixture_model" = c(
+    ari_semi_1 - ari_mix_1,
+    ari_semi_2 - ari_mix_2, 
+    ari_semi_3 - ari_mix_3
   )
 )
 
@@ -321,7 +373,8 @@ knitr::kable(results_df, digits = 3)
 out_lst <- list(
   "MCMC" = list(
     "Semisupservised" = new_semi,
-    "Unsupservised" = new_un
+    "Unsupservised" = new_un,
+    "Mixture_model" = new_mix
   ),
   "ARI" = results_df
 )
@@ -329,3 +382,8 @@ out_lst <- list(
 saveRDS(out_lst, save_file)
 
 cat("\n# === SCRIPT COMPLETE ================================================\n")
+
+t1 <- Sys.time()
+time_taken <- t1 - t0
+
+cat("\n\nTIME TAKEN:", round(time_taken, 2), attr(time_taken, "units"))
