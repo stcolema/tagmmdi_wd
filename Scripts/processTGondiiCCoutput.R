@@ -160,7 +160,7 @@ files <- list.files(model_output_dir,
   full.names = TRUE
 )
 
-plotting <- TRUE
+plotting <- FALSE
 plot_height <- 6
 plot_width <- 8
 
@@ -214,7 +214,7 @@ V <- length(data_modelled$data_modelled)
 view_inds <- seq(1, V)
 lopit_ind <- which(data_modelled$types == "TAGPM")
 
-D_considered <- c(100, 500, 1000, 2500, 5000)
+D_considered <- c(1000, 3000, 5000, 8000, 12000)
 D <- max(D_considered)
 number_depths <- length(D_considered)
 
@@ -226,7 +226,7 @@ models <- expand.grid(D_considered, W_considered)
 colnames(models) <- c("Depth", "Width")
 n_models <- nrow(models)
 
-thin <- 100
+thin <- 1000
 iterations <- seq(0, D, thin)
 
 allocation_list <- consensus_chains <- vector("list", W)
@@ -544,14 +544,19 @@ if (plotting) {
   )
 }
 
+cat("\nPlotting complete.\nSave output.")
+
 output <- list()
 output$classification_probability <- classification_probability[[n_models]]
 output$predicted_partitions <- vector("list", V)
 output$cms <- vector("list", V)
+output$allocations <- vector("list", V)
 for(v in view_inds) {
   output$predicted_partitions[[v]] <- predicted_partitions[[v]][[n_models]]
   output$cms[[v]] <- cms[[v]][[n_models]]
+  output$allocations[[v]] <- allocations[[number_depths]][chains_used, , v]
 }
 
 saveRDS(output, file = output_file)
 
+cat("\n# === SCRIPT COMPLETED ================================================")

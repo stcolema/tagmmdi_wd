@@ -146,10 +146,10 @@ model_output_dir <- "./T_gondii/ConsensusClustering/" #
 plot_dir <- paste0(save_dir, "Plots/")
 # dir.create(plot_dir, showWarnings = FALSE)
 
-R <- 5000 #
+R <- 12000 #
 K <- 125
 
-cc_file <- paste0(plot_dir, "T_gondi_CC_samples.rds")
+cc_file <- paste0(plot_dir, "CC_R_12000_K_125.rds")
 cc_out <- readRDS(cc_file)
 
 cat("\n=== Reading in files ===================================================")
@@ -192,7 +192,18 @@ lopit_data <- read.csv(lopit_file,
 data_modelled <- readRDS(paste0(inputdata_dir, "TGondiiMDI_K_125_input.rds"))
 datasets <- c("Cell_cycle", "RNA-seq", "LOPIT")
 
+# microarray_data <- data_modelled$data_modelled[[1]] |> 
+#   as_tibble()
+# rna_seq_data <- data_modelled$data_modelled[[2]] |> 
+#   as_tibble(rownames = "Gene")
+
 prediction_mat <- do.call(cbind, cc_out$predicted_partitions)
+
+# .alloc <- cc_out$allocations
+# cc_out$allocations <- array(NA, c(50, 3643, 3))
+# cc_out$allocations[, , 1] <- .alloc[[1]]
+# cc_out$allocations[, , 2] <- .alloc[[2]]
+# cc_out$allocations[, , 3] <- .alloc[[3]]
 
 D <- nrow(cc_out$allocations)
 fused_gene_probs_12 <- colSums(cc_out$allocations[ , , 1] == cc_out$allocations[ , , 2] ) / D
@@ -211,6 +222,8 @@ data("Barylyuk2020ToxoLopit")
 cols_used <- c("Description", "markers", "tagm.mcmc.allocation","tagm.mcmc.probability")
 tagm_comparison <- fData(Barylyuk2020ToxoLopit)[, cols_used]
 
+proteins_modelled <- row.names(data_modelled$data_modelled[[3]])
+
 label_to_organelle <- data.frame("Organelle" = levels(tagm_comparison$markers)[-27],
                                  "Label"= seq(1, 26)
 )
@@ -218,14 +231,16 @@ label_to_organelle <- data.frame("Organelle" = levels(tagm_comparison$markers)[-
 mdi_predictions <- label_to_organelle$Organelle[cc_out$predicted_partitions[[3]]]
 mdi_probabilities <- cc_out$classification_probability
 
-proteins_modelled <- which(row.names(tagm_comparison) %in% row.names(lopit_data))
-tagm_comparison <- tagm_comparison[proteins_modelled, ]
-tagm_comparison <- tagm_comparison[sort(row.names(tagm_comparison)), ]
+tagm_comparison <- tagm_comparison[proteins_modelled,  ]
+# proteins_modelled <- which(row.names(tagm_comparison) %in% row.names(lopit_data))
+# tagm_comparison <- tagm_comparison[proteins_modelled, ]
+# tagm_comparison <- tagm_comparison[sort(row.names(tagm_comparison)), ]
 tagm_comparison$mdi.mcmc.allocation <- mdi_predictions
 tagm_comparison$mdi.mcmc.probability <- mdi_probabilities
 tagm_comparison |> head()
 lopit_data |> head()
 
+tagm_comparison[fused_genes_23, ]
 
 lopit_data$MDI_prediction <- mdi_predictions
 lopit_data$TAGM_prediction <- tagm_comparison$tagm.mcmc.allocation
@@ -285,27 +300,28 @@ microarray_data |>
          Gene = row.names(microarray_data)) |> 
   pivot_longer(-c(Predicted_label, Gene), names_to = "Time", values_to = "Expression") |> 
   mutate(Time = factor(Time, labels = seq(0, 12))) |> 
-  filter(Predicted_label %in% c(1:6, 9)) |> 
+  # filter(Predicted_label %in% c(1:6, 9)) |> 
   ggplot(aes(x = Time, y = Expression, group = Gene)) + 
   geom_line(aes(color = Predicted_label)) +
-  ggthemes::scale_color_colorblind() + 
+  # ggthemes::scale_color_colorblind() + 
   facet_wrap(~Predicted_label)
 
-# rna_seq_data |> 
-#   mutate(Predicted_label = factor(cc_out$predicted_partitions[[2]]),
-#          Gene = row.names(rna_seq_data)) |> 
-#   pivot_longer(-c(Predicted_label, Gene), names_to = "Experiment", values_to = "Expression") |> 
-#   # mutate(Time = factor(Time, labels = seq(0, 12))) |> 
-#   # filter(Predicted_label %in% c(1:6, 9)) |> 
-#   ggplot(aes(x = Time, y = Expression, group = Gene)) + 
-#   geom_line(aes(color = Predicted_label)) +
-#   ggthemes::scale_color_colorblind() + 
-#   facet_wrap(~Predicted_label)
+rna_seq_data |>
+  mutate(Predicted_label = factor(cc_out$predicted_partitions[[2]]),
+         Gene = row.names(rna_seq_data)) |>
+  pivot_longer(-c(Predicted_label, Gene), names_to = "Experiment", values_to = "Expression") |>
+  # mutate(Time = factor(Time, labels = seq(0, 12))) |>
+  # filter(Predicted_label %in% c(1:6, 9)) |>
+  ggplot(aes(x = Experiment, y = Expression, group = Gene)) +
+  geom_line(aes(color = Predicted_label)) +
+  # ggthemes::scale_color_colorblind() +
+  facet_wrap(~Predicted_label)
 
 annotatedHeatmap(rna_seq_data, cc_out$predicted_partitions[[2]], 
                  show_colnames = FALSE, show_rownames = FALSE,
-                 main = "RNA-seq data annotated by predicted cluster",
-                 filename = "./rnaseq_predicted_clustering.png")
+                 main = "RNA-seq data annotated by predicted cluster" # ,
+                 # filename = "./rnaseq_predicted_clustering.png"
+                 )
 
 
 clusters_bigger_50 <- which(table(cc_out$predicted_partitions[[1]]) > 50)

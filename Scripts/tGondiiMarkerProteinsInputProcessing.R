@@ -184,8 +184,8 @@ setMyTheme()
 args <- input_arguments()
 
 # Directories for input and output respectively
-data_dir <- args$data_dir
-save_dir <- args$save_dir
+data_dir <- args$data_dir # "./T_gondii/Original_data/"
+save_dir <- args$save_dir # "./T_gondii/Prepared_data/"
 
 # The number of components modelled
 K <- args$K
@@ -201,7 +201,7 @@ save_file <- paste0(
   "TGondiiMDI",
   "_K_",
   n_clust_unsupervised,
-  "_input",
+  "_input_marker_proteins",
   ".rds"
 )
 
@@ -209,6 +209,11 @@ save_file <- paste0(
 microarray_file <- paste0(data_dir, "ToxoDB_TgME49_Protein-coding_DNA_microarray.txt")
 rna_seq_file <- paste0(data_dir, "ToxoDB_TgME49_Protein-coding_RNA-Seq.txt")
 data(Barylyuk2020ToxoLopit)
+
+# Use the same test indices across methods
+marker.data <- pRoloc::markerMSnSet(Barylyuk2020ToxoLopit)
+
+marker_proteins <- row.names(fData(marker.data))
 
 microarray_data <- fread(microarray_file,
                          na.strings = "N/A",
@@ -268,7 +273,10 @@ microarray_mat <- as.matrix(cleaned_microarray_data[, ..microarray_numeric_colum
 row.names(rna_mat) <- cleaned_rna_seq_data[[1]]
 row.names(microarray_mat) <- cleaned_microarray_data[[1]]
 
-protein_lst <- prepareMSObject(Barylyuk2020ToxoLopit, order_by_protein_name = TRUE)
+proteins_present_ind <- which(marker_proteins %in% cleaned_rna_seq_data[[1]])
+proteins_present <- marker_proteins[proteins_present_ind]
+
+protein_lst <- prepareMSObject(Barylyuk2020ToxoLopit[proteins_present, ], order_by_protein_name = FALSE)
 measurements <- colnames(protein_lst$X)
 proteins_represented <- row.names(protein_lst$X)
 
@@ -287,59 +295,8 @@ long_protein_df <- protein_df %>%
   ), names_to = "Fraction", values_to = "Value") %>%
   mutate(Fraction = factor(Fraction, levels = measurements, ordered = TRUE))
 
-proteins_in_rna_data_ind <- which(proteins_represented %in% remaining_genes) # index_protein_in_rna_data]
-proteins_in_rna_data <- proteins_represented[proteins_in_rna_data_ind]
-genes_in_protein_data_ind <- which(remaining_genes %in% proteins_in_rna_data)
-genes_in_protein_data <- remaining_genes[genes_in_protein_data_ind]
-
-rna_reducced_mat <- rna_mat[genes_in_protein_data_ind, ]
-microarray_reduced_mat <- microarray_mat[genes_in_protein_data_ind, ]
-
-protein_lst_red <- protein_lst
-protein_lst_red$X <- scale(protein_lst$X[proteins_in_rna_data_ind, ])
-protein_lst_red$fixed <- protein_lst$fixed[proteins_in_rna_data_ind, , drop = FALSE]
-protein_lst_red$initial_labels <- protein_lst$initial_labels[proteins_in_rna_data_ind, , drop = FALSE]
-# protein_lst$class_key <- protein_lst$X[proteins_in_rna_data_ind, ]
-
-# index_protein_in_rna_data <- match(remaining_genes, proteins_represented)
-# index_protein_in_rna_data <- index_protein_in_rna_data[!is.na(index_protein_in_rna_data)]
-# proteins_in_rna_data <- proteins_represented[index_protein_in_rna_data]
-
-# index_genes_in_protein_data <- match(proteins_in_rna_data, remaining_genes)
-# index_genes_in_protein_data <- index_genes_in_protein_data[!is.na(index_genes_in_protein_data)]
-# genes_in_protein_data <- remaining_genes[index_genes_in_protein_data]
-
-mismatch_in_items <- any(genes_in_protein_data != proteins_in_rna_data)
-if (mismatch_in_items) {
-  stop("Still mismatch in items analysed.")
-}
-
-# retained_rows <- match(genes_in_protein_data, cleaned_microarray_data$`Gene ID`)
-# 
-# final_microarray_data <- cleaned_microarray_data[retained_rows, ]
-# final_rna_seq_data <- cleaned_rna_seq_data[retained_rows, ]
-# 
-# final_protein_df <- protein_df[match(proteins_in_rna_data, protein_df$Protein), ]
-# 
-# all_items_matching <- (all(final_protein_df$Protein == final_rna_seq_data$`Gene ID`) &
-#                          all(final_protein_df$Protein == final_microarray_data$`Gene ID`)
-# )
-# 
-# if (!all_items_matching) {
-#   stop("There's a mismatch in the order / membership of genes represented.")
-# }
-# 
-# rna_mat <- log(as.matrix(final_rna_seq_data[, ..rna_seq_numeric_columns]) + 1)
-# microarray_mat <- as.matrix(final_microarray_data[, ..microarray_numeric_columns])
-# protein_mat <- as.matrix(final_protein_df[, -c(31:33)])
-# 
-# gene_ids <- row.names(final_protein_df)
-# row.names(microarray_mat) <- row.names(rna_mat) <- gene_ids
-# fixed <- which(final_protein_df$Fixed == 1)
-
-# rna_reducced_mat
-# microarray_reduced_mat
-# protein_lst_red
+rna_reducced_mat <- rna_mat[proteins_present, ]
+microarray_reduced_mat <- microarray_mat[proteins_present, ]
 
 rnaseq_macrophages_infected_by_T_gondii_inds <- seq(85, 142)
 rnaseq_macrophages_infected_by_T_gondii <- rna_reducced_mat[, rnaseq_macrophages_infected_by_T_gondii_inds]
@@ -361,14 +318,14 @@ m_white_cell_cycle_normalised <- m_white_cell_cycle %>%
   t() %>%
   na.omit()
 
-final_protein_df <-  data.frame(protein_lst_red$X) %>%
+final_protein_df <-  data.frame(protein_lst$X) %>%
   mutate(
-    Protein = row.names(protein_lst_red$X),
-    Label = factor(protein_lst_red$initial_labels[, 1]),
-    Fixed = protein_lst_red$fixed[, 1]
+    Protein = row.names(protein_lst$X),
+    Label = factor(protein_lst$initial_labels[, 1]),
+    Fixed = protein_lst$fixed[, 1]
   )
 
-protein_mat <- protein_lst_red$X
+protein_mat <- protein_lst$X
 
 shortened_col_names <- normalised_rnaseq_macrophages_infected_by_T_gondii |> 
   colnames() |>
@@ -378,10 +335,9 @@ shortened_col_names <- normalised_rnaseq_macrophages_infected_by_T_gondii |>
 
 colnames(normalised_rnaseq_macrophages_infected_by_T_gondii) <- shortened_col_names
 
-
-write.csv(m_white_cell_cycle_normalised, paste0(save_dir, "cellCycleNormalised.csv"))
-write.csv(normalised_rnaseq_macrophages_infected_by_T_gondii, paste0(save_dir, "rnaSeqMacrophage.csv"))
-write.csv(final_protein_df, paste0(save_dir, "LOPITreduced.csv"))
+write.csv(m_white_cell_cycle_normalised, paste0(save_dir, "markerProteinsCellCycleNormalised.csv"))
+write.csv(normalised_rnaseq_macrophages_infected_by_T_gondii, paste0(save_dir, "markerProteinsRNASeqMacrophage.csv"))
+write.csv(final_protein_df, paste0(save_dir, "markerProteinsLOPIT.csv"))
 
 data_modelled <- list(
   protein_mat,
@@ -404,6 +360,7 @@ K <- c(
   length(pRoloc::getMarkerClasses(Barylyuk2020ToxoLopit)),
   n_clust_unsupervised,
   n_clust_unsupervised
+  
 )
 
 train_inds <- which( final_protein_df$Fixed == 1)
@@ -436,3 +393,95 @@ mcmc_input <- list(
 saveRDS(mcmc_input, file = save_file)
 
 cat("\n\n=== INPUT SAVED ===================================================\n")
+R <- 5000
+thin <- 100
+n_chains <- 3
+burn <- 1250
+K <- c(26, 75, 75)
+
+# saveRDS(mdi_mcmc, file = "~/Desktop/mdi3chainsR5000.rds")
+
+mdi_mcmc <- runMCMCChains(data_modelled, n_chains, R, thin, 
+                          initial_labels = initial_labels, 
+                          fixed = fixed, 
+                          types = types, 
+                          K = K
+)
+
+processed_mcmc <- predictFromMultipleChains(mdi_mcmc, burn, construct_psm = TRUE)
+
+mdi_mcmc[[1]]$phis |> boxplot()
+
+processed_mcmc$phis |> boxplot()
+
+psm1 <- mdi_mcmc[[1]]$allocations[, , 1] |> createSimilarityMat()
+psm2 <- mdi_mcmc[[1]]$allocations[, , 2] |> createSimilarityMat()
+psm3 <- mdi_mcmc[[1]]$allocations[, , 3] |> createSimilarityMat()
+
+pheatmap::pheatmap(processed_mcmc$psm[[2]])
+pheatmap::pheatmap(processed_mcmc$psm[[3]])
+
+processed_mcmc$allocations |> str()
+
+which(colMeans(processed_mcmc$allocations[[1]] == processed_mcmc$allocations[[2]]) > 0.5)
+which(colMeans(processed_mcmc$allocations[[1]] == processed_mcmc$allocations[[3]]) > 0.5)
+which(colMeans(processed_mcmc$allocations[[2]] == processed_mcmc$allocations[[3]]) > 0.5)
+
+phi_names <- paste0("Phi_", c("12", "13", "23"))
+
+for(ii in seq(1, n_chains)) {
+  
+  .phi_df <- mdi_mcmc[[ii]]$phi |> 
+    as.data.frame() |> 
+    set_colnames(phi_names) |> 
+    mutate(Iteration = seq(0, R, thin), Chain = ii) |> 
+    pivot_longer(-c(Iteration, Chain), names_to = "Parameter", values_to = "Sampled_value")
+  
+  .mass_df <- mdi_mcmc[[ii]]$mass |> 
+    as.data.frame() |> 
+    set_colnames(paste0("Mass_", seq(1, V))) |> 
+    mutate(Iteration = seq(0, R, thin), Chain = ii) |> 
+    pivot_longer(-c(Iteration, Chain), names_to = "Parameter", values_to = "Sampled_value")
+  if(ii == 1) {
+    mass_df <- .mass_df
+    phi_df <- .phi_df
+  }  else {
+    mass_df <- rbind(mass_df, .mass_df)
+    phi_df <- rbind(phi_df, .phi_df)
+  }
+}
+
+phi_df$Chain <- factor(phi_df$Chain)
+mass_df$Chain <- factor(mass_df$Chain)
+
+mass_df |> 
+  ggplot(aes(x = Iteration, y = Sampled_value, colour = Chain)) +
+  geom_line() +
+  facet_wrap(~Parameter) +
+  ggthemes::scale_color_colorblind()
+
+phi_df |> 
+  ggplot(aes(x = Iteration, y = Sampled_value, colour = Chain)) +
+  geom_line() +
+  facet_wrap(~Parameter) +
+  ggthemes::scale_color_colorblind()
+
+cbind(mdi_mcmc[[1]]$evidence,
+      mdi_mcmc[[2]]$evidence,
+      mdi_mcmc[[3]]$evidence
+) |> 
+  as.data.frame() |> 
+  set_colnames(paste0("Chain_", seq(1, n_chains))) |> 
+  mutate(Iteration = seq(thin, R, thin)) |> 
+  pivot_longer(-Iteration, names_to = "Chain", values_to = "Evidence") |> 
+  ggplot(aes(x = Iteration, y = Evidence, colour = Chain)) +
+  geom_line() +
+  ggthemes::scale_color_colorblind()
+
+chain_used <- processMCMCChain(mdi_mcmc[[3]], 4000)
+
+chain_used$allocations
+
+which(colMeans(chain_used$allocations[, ,1] == chain_used$allocations[, ,2]) > 0.5)
+which(colMeans(chain_used$allocations[, ,1] == chain_used$allocations[, , 3]) > 0.5)
+which(colMeans(chain_used$allocations[, ,2] == chain_used$allocations[, , 3]) > 0.5)
