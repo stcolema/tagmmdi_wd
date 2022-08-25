@@ -6,7 +6,7 @@ Paper specific scripts.
 Generate the data by calling:
 
 ```{bash generateSims}
-Rscript ./Scripts/R/generateSimulationDataV3.R --save_dir "./Simulations/DataPhiModel/" --plot_data TRUE;
+Rscript ./Scripts/generateSimulationDataV3.R --save_dir "./Simulations/DataPhiModel/" --plot_data TRUE;
 ```
 
 Analyse this data by calling
@@ -17,13 +17,13 @@ n_sims=100;
 
 for scn in "${scenarios[@]}"
 do
-  for((ii = 1; ii <= ${n_sims}; ii++))
+  for(( ii=1; ii<=${n_sims}; ii++))
   do
     # The case with K known
-    Rscript ./Scripts/R/analyseSimulation.R --R 15000 --thin 100 --burn 7500 --index ${ii} --n_chains 10 --K 6 --n_clust_unsupervised 50 --scn ${scn} --save_dir ./Simulations/OutputPhiModel/ --data_dir ./Simulations/DataPhiModel/;
+    Rscript ./Scripts/analyseSimulation.R --R 15000 --thin 100 --burn 7500 --index ${ii} --n_chains 10 --K 6 --n_clust_unsupervised 50 --scn ${scn} --save_dir ./Simulations/OutputPhiModel/ --data_dir ./Simulations/DataPhiModel/;
     
     # Using an overfitted mixture
-    Rscript ./Scripts/R/analyseSimulation.R --R 15000 --thin 100 --burn 7500 --index ${ii} --n_chains 10 --K 60 --n_clust_unsupervised 50 --scn ${scn} --save_dir ./Simulations/OutputPhiModel/ --data_dir ./Simulations/DataPhiModel/;
+    Rscript ./Scripts/analyseSimulation.R --R 15000 --thin 100 --burn 7500 --index ${ii} --n_chains 10 --K 60 --n_clust_unsupervised 50 --scn ${scn} --save_dir ./Simulations/OutputPhiModel/ --data_dir ./Simulations/DataPhiModel/;
   done
 done
 ```
@@ -65,5 +65,23 @@ Rscript tGondiiMDIInputs.R --K 125 --save_dir "./T_gondii/Output/" --data_dir ".
 Then call MDI using
 
 ```{bash tGondiiCC}
-Rscript ./Scripts/R/processTGondiiCCoutput.R --data_dir ./T_gondii/Data/ --R 12000 --K 125 --save_dir ./T_gondii/ConsensusClustering/ --model_output_dir ./T_gondii/ConsensusClustering/
+# The long chains
+n_chains=9;
+for(( ii=1; ii<=${n_chains}; ii++))
+do
+  Rscript ./Scripts/callMDITGondiiModelOnly.R --data_file ./T_gondii/Data/TGondiiMDI_K_125_input.rds --R 45000 --thin 250 --seed ${ii} --K 125 --n_chains 1 --save_dir ./T_gondii/Output/;
+done;
+
+# Consensus clustering
+n_chains=50;
+for(( ii=1; ii<=${n_chains}; ii++))
+do
+  Rscript ./Scripts/callMDITGondiiModelOnly.R --data_file ./T_gondii/Data/TGondiiMDI_K_125_input.rds --R 12000 --thin 1000 --seed ${ii} --K 125 --n_chains 1 --save_dir ./T_gondii/ConsensusClustering/;
+done;
+```
+
+Then to process the output of the consensus clustering
+
+```{r processCC}
+Rscript ./Scripts/processTGondiiCCoutput.R --data_dir ./T_gondii/Data/ --R 12000 --K 125 --save_dir ./T_gondii/ConsensusClustering/ --model_output_dir ./T_gondii/ConsensusClustering/
 ```
