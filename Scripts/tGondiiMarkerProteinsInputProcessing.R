@@ -340,7 +340,7 @@ write.csv(normalised_rnaseq_macrophages_infected_by_T_gondii, paste0(save_dir, "
 write.csv(final_protein_df, paste0(save_dir, "markerProteinsLOPIT.csv"))
 
 data_modelled <- list(
-  protein_mat,
+  protein_mat[, 1, drop = FALSE],
   m_white_cell_cycle_normalised,
   normalised_rnaseq_macrophages_infected_by_T_gondii
 )
@@ -354,7 +354,7 @@ fixed[, 1] <- final_protein_df$Fixed
 initial_labels[, 1] <- final_protein_df$Label
 
 # types <- c("MVN", "G", "TAGM")
-types <- c("TAGPM", "GP", "G")
+types <- c("G", "GP", "G")
 
 K <- c(
   length(pRoloc::getMarkerClasses(Barylyuk2020ToxoLopit)),
