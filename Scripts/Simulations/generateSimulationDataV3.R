@@ -175,26 +175,46 @@ generateViewGivenStructure <- function(generating_structure, frac_present, P, K,
   )
 }
 
+constructPhiMatrix <- function(phis, V) {
+  VC2 <- length(phis)
+  phi_mat <- matrix(0, V, V)
+  phi_accessed <- 0
+  for(v in seq(1, V - 1)) {
+    for(w in seq(v + 1, V)) {
+      phi_accessed <- phi_accessed + 1
+      phi_mat[v, w] <- phi_mat[w, v] <- phis[phi_accessed]
+    }
+  }
+  phi_mat
+}
 
-generateMDIDataLabels <- function(N, V, K, gammas, phis) {
+generateMDIDataLabels <- function(N, V, K, gammas, phis, n_iter = 10) {
   N_inds <- seq(1, N)
   V_inds <- seq(1, V)
 
   labels <- matrix(0, N, V)
 
-  for (n in seq(1, N)) {
-    for (v in seq(1, V)) {
-      V_comp_inds <- V_inds[-v]
-      comps <- seq(1, K[v])
-      weights <- gammas[comps, v]
-      if (v > 1) {
-        for (w in seq(1, v - 1)) {
-          label_in_view_w <- labels[n, w]
-          weights[label_in_view_w] <- weights[label_in_view_w] * (1.0 + phis[v, w])
-        }
+  for(ii in seq(1, n_iter)) {
+    for (n in seq(1, N)) {
+      for (v in seq(1, V)) {
+        V_comp_inds <- V_inds[-v]
+        comps <- seq(1, K[v])
+        weights <- gammas[comps, v]
+        # if (v > 1) {
+          if(ii > 1) {
+            for (w in seq(1, V)) {
+              if(w != v) {
+                label_in_view_w <- labels[n, w]
+                if(label_in_view_w <= K[v]) {
+                  weights[label_in_view_w] <- weights[label_in_view_w] * (1.0 + phis[v, w])
+                }
+              }
+            }
+          }
+        # }
+        weights <- weights / sum(weights)
+        labels[n, v] <- sample(comps, prob = weights, size = 1)
       }
-      weights <- weights / sum(weights)
-      labels[n, v] <- sample(comps, prob = weights, size = 1)
     }
   }
   labels
@@ -366,7 +386,7 @@ sample_file <- paste0(save_dir, "mcmcMDISimPhiModelTestFrac", test_frac_str, "Se
 plot_file <- paste0(save_dir, "mcmcMDISimPhiModelTestFrac", test_frac_str, "Seed", seed, ".png")
 
 N <- 200
-P <- c(30, 25, 20)
+P <- c(15, 15, 15)
 K <- c(6, 7, 8)
 K_max <- max(K)
 V <- length(K)
@@ -377,7 +397,9 @@ weight_rate <- 2
 frac_present <- c(1, 1, 1) # 0.5, 0.4)
 frac_known <- 0.3
 
-phis <- matrix(c(0, 15, 10, 15, 0, 5, 10, 5, 0), V, V)
+phi_vec <- c(12, 8, 4)
+phi_mat <- constructPhiMatrix(phi_vec, V)
+phis <- phi_mat # matrix(c(0, 15, 10, 15, 0, 5, 10, 5, 0), V, V)
 
 # Scenarios are defined by changing how view 1 is misspecified
 scenarios <- c("Gaussian", "MVT", "LogPoisson")
@@ -397,13 +419,30 @@ gammas <- matrix(c(
 #   6.0, 6.0, 5.0, 3.0, 5.5, 7.0, 4.0, 4.0, 4.0, 4.0, 4.0
 # ), ncol = V)
 
+# compareLabels <- function(labels) {
+#   c(mcclust::arandi(labels[, 1], labels[,2]),
+#     mcclust::arandi(labels[, 1], labels[, 3]),
+#     mcclust::arandi(labels[, 2], labels[, 3])
+#   )
+# }
+# 
+# n_comps <- 100
+# labels_comp_mat <- matrix(0, n_comps, choose(V, 2))
+# for(i in seq(1, n_comps)) {
+#   .c <- generateMDIDataLabels(N, V, K, gammas, phis, 15)
+#   .x <- compareLabels(.c)
+#   labels_comp_mat[i, ] <- .x
+# }
+# 
+# boxplot(labels_comp_mat)
+
 for (n in seq(1, n_datasets)) {
   # gammas <- matrix(0, K_max, V)
   # for (v in seq(1, V)) {
   #   gammas[seq(1, K[v]), v] <- rgamma(K[v], weight_shape, weight_rate)
   # }
 
-  labels <- generateMDIDataLabels(N, V, K, gammas, phis)
+  labels <- generateMDIDataLabels(N, V, K, gammas, phis, 15)
 
   P_1 <- P[1]
   K_1 <- K[1]
