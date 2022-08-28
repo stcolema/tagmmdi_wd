@@ -2,7 +2,7 @@
 
 suppressMessages(library(tagmReDraft))
 suppressMessages(library(mdiHelpR))
-suppressMessages(library(batchmix))
+# suppressMessages(library(batchmix))
 suppressMessages(library(magrittr))
 suppressMessages(library(mcclust))
 suppressMessages(library(tidyr))
@@ -308,22 +308,28 @@ cat("\n\n# === MODELLING COMPLETE =============================================\
 
 cat("\nProcess output.")
 mcmc_semi_overfit <- processMCMCChains(mcmc_semi_overfit, burn,
+  point_estimate_method = "median",
   construct_psm = TRUE
 )
 mcmc_semi_k_known <- processMCMCChains(mcmc_semi_k_known, burn,
+  point_estimate_method = "median",
   construct_psm = TRUE
 )
 mcmc_un <- processMCMCChains(mcmc_un, burn,
+  point_estimate_method = "median",
   construct_psm = TRUE
 )
 
-# new_semi <- predictFromMultipleChains(mcmc_semi, burn, construct_psm = FALSE)
-# new_un <- predictFromMultipleChains(mcmc_un, burn, construct_psm = FALSE)
-
 new_mix <- list()
 for (v in seq(1, V)) {
-  mcmc_mix_overfitted[[v]] <- processMCMCChains(mcmc_mix_overfitted[[v]], burn, construct_psm = TRUE)
-  mcmc_mix_k_known[[v]] <- processMCMCChains(mcmc_mix_k_known[[v]], burn, construct_psm = TRUE)
+  mcmc_mix_overfitted[[v]] <- processMCMCChains(mcmc_mix_overfitted[[v]], burn,
+    point_estimate_method = "median",
+    construct_psm = TRUE
+  )
+  mcmc_mix_k_known[[v]] <- processMCMCChains(mcmc_mix_k_known[[v]], burn,
+    point_estimate_method = "median",
+    construct_psm = TRUE
+  )
   # new_mix[[v]] <- predictFromMultipleChains(mcmc_mix[[v]], burn, construct_psm = FALSE)
 }
 
@@ -331,40 +337,39 @@ for (v in seq(1, V)) {
 # K_pred_un <- K_pred_semi <- K_pred_mix <- c()
 
 results_df <- NULL
-K_pred_mdi_semi_overfit <- K_pred_mdi_semi_k_known <- K_pred_mdi_un <- K_pred_mix_overfit <- K_pred_mix_k_known <- matrix(0, n_chains,)
+K_pred_mdi_semi_overfit <- K_pred_mdi_semi_k_known <- K_pred_mdi_un <- K_pred_mix_overfit <- K_pred_mix_k_known <- matrix(0, n_chains, V)
 for (v in seq(1, V)) {
-  
-  for(ii in seq(1, n_chains)) {
+  for (ii in seq(1, n_chains)) {
     .cl_mdi_un <- maxpear(mcmc_un[[ii]]$psm[[v]])$cl
     .cl_mdi_semi_overfit <- maxpear(mcmc_semi_overfit[[ii]]$psm[[v]])$cl
     .cl_mdi_semi_k_known <- maxpear(mcmc_semi_k_known[[ii]]$psm[[v]])$cl
     .cl_mixture_overfit <- maxpear(mcmc_mix_overfitted[[v]][[ii]]$psm[[1]])$cl
     .cl_mixture_k_known <- maxpear(mcmc_mix_k_known[[v]][[ii]]$psm[[1]])$cl
-    
+
     K_pred_mdi_un[ii, v] <- .k_mdi_un <- length(unique(.cl_mdi_un))
     K_pred_mdi_semi_overfit[ii, v] <- .k_mdi_semi_overfit <- length(unique(.cl_mdi_semi_overfit))
     K_pred_mdi_semi_k_known[ii, v] <- .k_mdi_semi_k_known <- length(unique(.cl_mdi_semi_k_known))
     K_pred_mix_overfit[ii, v] <- .k_mix_overfit <- length(unique(.cl_mixture_overfit))
     K_pred_mix_k_known[ii, v] <- .k_mix_k_known <- length(unique(.cl_mixture_k_known))
-    
+
     k_true <- length(unique(sim_cl[[v]]))
-    
-    if(.k_mdi_un < k_true) {
+
+    if (.k_mdi_un < k_true) {
       K_pred_mdi_un[ii, v] <- k_true
     }
-    if(.k_mdi_semi_overfit < k_true) {
+    if (.k_mdi_semi_overfit < k_true) {
       K_pred_mdi_semi_overfit[ii, v] <- k_true
     }
-    if(.k_mdi_semi_k_known < k_true) {
+    if (.k_mdi_semi_k_known < k_true) {
       K_pred_mdi_semi_k_known[ii, v] <- k_true
     }
-    if(.k_mix_overfit < k_true) {
+    if (.k_mix_overfit < k_true) {
       K_pred_mix_overfit[ii, v] <- k_true
     }
-    if(.k_mix_k_known < k_true) {
+    if (.k_mix_k_known < k_true) {
       K_pred_mix_k_known[ii, v] <- k_true
     }
-    
+
     mcmc_un[[ii]]$pred[[v]] <- factor(.cl_mdi_un,
       levels = seq(1, K_pred_mdi_un[ii, v])
     )
@@ -382,7 +387,7 @@ for (v in seq(1, V)) {
     )
 
     cat("\nCompare to truth using the adjusted rand index.")
-    
+
     perf_df <- data.frame(
       "Model" = c("MDI.unsupervised", "MDI.semi-supervised.overfitted", "MDI.semi-supervised", "Mixture.model.overfitted", "Mixture.model"),
       "ARI.test.labels" = c(
@@ -404,47 +409,46 @@ for (v in seq(1, V)) {
       "Scenario" = scn,
       "Index" = index
     )
-    
-    if(is.null(results_df)) {
+
+    if (is.null(results_df)) {
       results_df <- perf_df
     } else {
       results_df <- rbind(results_df, perf_df)
     }
-    
+
     # ari_semi_1 <- mcclust::arandi(new_semi$pred[[1]][test_inds], sim_cl$View_1[test_inds])
     # ari_un_1 <- mcclust::arandi(new_un$pred[[1]][test_inds], sim_cl$View_1[test_inds])
     # ari_mix_1 <- mcclust::arandi(new_mix[[1]]$pred[[1]][test_inds], sim_cl$View_1[test_inds])
-    # 
+    #
     # ari_semi_2 <- mcclust::arandi(new_semi$pred[[2]], sim_cl$View_2)
     # ari_un_2 <- mcclust::arandi(new_un$pred[[2]], sim_cl$View_2)
     # ari_mix_2 <- mcclust::arandi(new_mix[[2]]$pred[[1]], sim_cl$View_2)
-    # 
+    #
     # ari_semi_3 <- mcclust::arandi(new_semi$pred[[3]], sim_cl$View_3)
     # ari_un_3 <- mcclust::arandi(new_un$pred[[3]], sim_cl$View_3)
     # ari_mix_3 <- mcclust::arandi(new_mix[[3]]$pred[[1]], sim_cl$View_3)
-    
+
     # new_semi$pred[[v]] <- factor(.cl_semi, levels = seq(1, K_pred_semi[v]))
     # new_un$pred[[v]] <- factor(.cl_un, levels = seq(1, K_pred_un[v]))
     # new_mix[[v]]$pred[[1]] <- factor(.cl_mix, levels = seq(1, K_pred_mix[v]))
-    
   }
-  
+
   # psms_semi[[v]] <- createSimilarityMat(new_semi$allocations[[v]])
   # psms_un[[v]] <- createSimilarityMat(new_un$allocations[[v]])
   # psms_mix[[v]] <- createSimilarityMat(new_mix[[v]]$allocations[[1]])
-  # 
-  # 
-  # 
+  #
+  #
+  #
   # .cl_semi <- mcclust::maxpear(psms_semi[[v]])$cl
   # .cl_un <- mcclust::maxpear(psms_un[[v]])$cl
   # .cl_mix <- mcclust::maxpear(psms_mix[[v]])$cl
-  # 
+  #
   # K_pred_semi[v] <- .k_semi <- length(unique(.cl_semi))
   # K_pred_un[v] <- .k_un <- length(unique(.cl_un))
   # K_pred_mix[v] <- .k_mix <- length(unique(.cl_mix))
-  # 
+  #
   # k_true <- length(unique(sim_cl[[v]]))
-  # 
+  #
   # if (.k_semi < k_true) {
   #   K_pred_semi[v] <- k_true
   # }
@@ -454,7 +458,7 @@ for (v in seq(1, V)) {
   # if (.k_mix < k_true) {
   #   K_pred_mix[v] <- .k_mix
   # }
-  # 
+  #
   # new_semi$pred[[v]] <- factor(.cl_semi, levels = seq(1, K_pred_semi[v]))
   # new_un$pred[[v]] <- factor(.cl_un, levels = seq(1, K_pred_un[v]))
   # new_mix[[v]]$pred[[1]] <- factor(.cl_mix, levels = seq(1, K_pred_mix[v]))
@@ -472,21 +476,21 @@ for (v in seq(1, V)) {
 #
 # multiClassF1(new_semi$pred[[3]], factor(sim_cl$View_3, levels = seq(1, K_pred_semi[3])))
 # multiClassF1(new_un$pred[[3]], factor(sim_cl$View_3, levels = seq(1, K_pred_un[3])))
-# 
+#
 # cat("\nCompare to truth using the adjusted rand index.")
-# 
+#
 # ari_semi_1 <- mcclust::arandi(new_semi$pred[[1]][test_inds], sim_cl$View_1[test_inds])
 # ari_un_1 <- mcclust::arandi(new_un$pred[[1]][test_inds], sim_cl$View_1[test_inds])
 # ari_mix_1 <- mcclust::arandi(new_mix[[1]]$pred[[1]][test_inds], sim_cl$View_1[test_inds])
-# 
+#
 # ari_semi_2 <- mcclust::arandi(new_semi$pred[[2]], sim_cl$View_2)
 # ari_un_2 <- mcclust::arandi(new_un$pred[[2]], sim_cl$View_2)
 # ari_mix_2 <- mcclust::arandi(new_mix[[2]]$pred[[1]], sim_cl$View_2)
-# 
+#
 # ari_semi_3 <- mcclust::arandi(new_semi$pred[[3]], sim_cl$View_3)
 # ari_un_3 <- mcclust::arandi(new_un$pred[[3]], sim_cl$View_3)
 # ari_mix_3 <- mcclust::arandi(new_mix[[3]]$pred[[1]], sim_cl$View_3)
-# 
+#
 # results_df <- data.frame(
 #   "Scenario" = rep(scn, V),
 #   "Index" = rep(index, V),

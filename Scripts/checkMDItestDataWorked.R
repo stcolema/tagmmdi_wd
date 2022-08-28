@@ -33,17 +33,47 @@ findFusedGenesAcrossAllViews <- function(mcmc, threshold = 0.5) {
 
 out_dir <- "./MDITestData/Output/Unsupervised//"
 
+labels <- c(
+  rep(1, 15),
+  rep(2, 35),
+  rep(3, 6),
+  rep(4, 8),
+  rep(5, 11),
+  rep(6, 8),
+  rep(7, 17)
+)
+
 mditest1 <- read.csv("./MDITestData/MDItestdata1.csv", row.names = 1)
 mditest2 <- read.csv("./MDITestData/MDItestdata2.csv", row.names = 1)
 mditest3 <- read.csv("./MDITestData/MDItestdata3.csv", row.names = 1)
 mditest4 <- read.csv("./MDITestData/MDItestdata4.csv", row.names = 1)
 gene_names <- row.names(mditest1)
 
+
+row_order1 <- findOrder(mditest1)
+row_order2 <- findOrder(mditest2)
+row_order3 <- findOrder(mditest3)
+row_order4 <- findOrder(mditest4)
+
+labels2a <- c(
+  rep(1, 15),
+  rep(4, 8),
+  rep(3, 6),
+  rep(5, 11),
+  rep(6, 8),
+  rep(7, 17),
+  rep(2, 35)
+)
+
+labels2 <- labels2a[match(row.names(mditest2), row.names(mditest2[row_order2, ]))]
+labels3 <- labels2a[match(row.names(mditest3), row.names(mditest3[row_order3, ]))]
+labels4 <- labels2a[match(row.names(mditest4), row.names(mditest4[row_order4, ]))]
+
 files <- list.files(out_dir, pattern = "*rds", full.names = TRUE)
 n_files <- length(files)
 
 mcmc_out <- list()
-burn <- 2e4
+burn <- 15000 # 1e4
 
 psms <- vector("list", 4)
 
@@ -111,32 +141,48 @@ fused_genes_1 <- findFusedGenesAcrossAllViews(mcmc_out[[1]])
 fused_genes_2 <- findFusedGenesAcrossAllViews(mcmc_out[[2]])
 fused_genes_3 <- findFusedGenesAcrossAllViews(mcmc_out[[3]])
 
-mcmc_out[[1]]$predicted_clustering
+annotatedHeatmap(mcmc_out[[1]]$psm[[1]], labels, col_pal = simColPal(), my_breaks = defineBreaks(simColPal(), lb = 0))
+annotatedHeatmap(mcmc_out[[2]]$psm[[1]], labels, col_pal = simColPal(), my_breaks = defineBreaks(simColPal(), lb = 0))
+annotatedHeatmap(mcmc_out[[3]]$psm[[1]], labels, col_pal = simColPal(), my_breaks = defineBreaks(simColPal(), lb = 0))
+annotatedHeatmap(mcmc_out[[4]]$psm[[1]], labels, col_pal = simColPal(), my_breaks = defineBreaks(simColPal(), lb = 0))
+annotatedHeatmap(mcmc_out[[5]]$psm[[1]], labels, col_pal = simColPal(), my_breaks = defineBreaks(simColPal(), lb = 0))
+annotatedHeatmap(mcmc_out[[6]]$psm[[1]], labels, col_pal = simColPal(), my_breaks = defineBreaks(simColPal(), lb = 0))
+annotatedHeatmap(mcmc_out[[7]]$psm[[1]], labels, col_pal = simColPal(), my_breaks = defineBreaks(simColPal(), lb = 0))
+annotatedHeatmap(mcmc_out[[8]]$psm[[1]], labels, col_pal = simColPal(), my_breaks = defineBreaks(simColPal(), lb = 0))
 
-annotatedHeatmap(mditest1, mcmc_out[[1]]$predicted_clustering[[1]])
-annotatedHeatmap(mditest1, mcmc_out[[2]]$predicted_clustering[[1]])
-annotatedHeatmap(mditest1, mcmc_out[[3]]$predicted_clustering[[1]])
+annotatedHeatmap(mcmc_out[[1]]$psm[[2]], labels2, col_pal = simColPal(), my_breaks = defineBreaks(simColPal(), lb = 0))
+annotatedHeatmap(mcmc_out[[2]]$psm[[2]], labels2, col_pal = simColPal(), my_breaks = defineBreaks(simColPal(), lb = 0))
+annotatedHeatmap(mcmc_out[[3]]$psm[[2]], labels2, col_pal = simColPal(), my_breaks = defineBreaks(simColPal(), lb = 0))
+annotatedHeatmap(mcmc_out[[4]]$psm[[2]], labels2, col_pal = simColPal(), my_breaks = defineBreaks(simColPal(), lb = 0))
+annotatedHeatmap(mcmc_out[[5]]$psm[[2]], labels2, col_pal = simColPal(), my_breaks = defineBreaks(simColPal(), lb = 0))
+annotatedHeatmap(mcmc_out[[6]]$psm[[2]], labels2, col_pal = simColPal(), my_breaks = defineBreaks(simColPal(), lb = 0))
+annotatedHeatmap(mcmc_out[[7]]$psm[[2]], labels2, col_pal = simColPal(), my_breaks = defineBreaks(simColPal(), lb = 0))
+annotatedHeatmap(mcmc_out[[8]]$psm[[2]], labels2, col_pal = simColPal(), my_breaks = defineBreaks(simColPal(), lb = 0))
 
-annotatedHeatmap(mditest2, mcmc_out[[1]]$predicted_clustering[[2]])
-annotatedHeatmap(mditest2, mcmc_out[[2]]$predicted_clustering[[2]])
-annotatedHeatmap(mditest2, mcmc_out[[3]]$predicted_clustering[[2]])
+annotatedHeatmap(mcmc_out[[1]]$psm[[3]], labels3, col_pal = simColPal(), my_breaks = defineBreaks(simColPal(), lb = 0))
+annotatedHeatmap(mcmc_out[[2]]$psm[[3]], labels3, col_pal = simColPal(), my_breaks = defineBreaks(simColPal(), lb = 0))
+annotatedHeatmap(mcmc_out[[3]]$psm[[3]], labels3, col_pal = simColPal(), my_breaks = defineBreaks(simColPal(), lb = 0))
+annotatedHeatmap(mcmc_out[[4]]$psm[[3]], labels3, col_pal = simColPal(), my_breaks = defineBreaks(simColPal(), lb = 0))
+annotatedHeatmap(mcmc_out[[5]]$psm[[3]], labels3, col_pal = simColPal(), my_breaks = defineBreaks(simColPal(), lb = 0))
+annotatedHeatmap(mcmc_out[[6]]$psm[[3]], labels3, col_pal = simColPal(), my_breaks = defineBreaks(simColPal(), lb = 0))
+annotatedHeatmap(mcmc_out[[7]]$psm[[3]], labels3, col_pal = simColPal(), my_breaks = defineBreaks(simColPal(), lb = 0))
+annotatedHeatmap(mcmc_out[[8]]$psm[[3]], labels3, col_pal = simColPal(), my_breaks = defineBreaks(simColPal(), lb = 0))
 
-annotatedHeatmap(mditest3, mcmc_out[[1]]$predicted_clustering[[3]])
-annotatedHeatmap(mditest3, mcmc_out[[2]]$predicted_clustering[[3]])
-annotatedHeatmap(mditest3, mcmc_out[[3]]$predicted_clustering[[3]])
+annotatedHeatmap(mcmc_out[[1]]$psm[[4]], labels4, col_pal = simColPal(), my_breaks = defineBreaks(simColPal(), lb = 0))
+annotatedHeatmap(mcmc_out[[2]]$psm[[4]], labels4, col_pal = simColPal(), my_breaks = defineBreaks(simColPal(), lb = 0))
+annotatedHeatmap(mcmc_out[[3]]$psm[[4]], labels4, col_pal = simColPal(), my_breaks = defineBreaks(simColPal(), lb = 0))
+annotatedHeatmap(mcmc_out[[4]]$psm[[4]], labels4, col_pal = simColPal(), my_breaks = defineBreaks(simColPal(), lb = 0))
+annotatedHeatmap(mcmc_out[[5]]$psm[[4]], labels4, col_pal = simColPal(), my_breaks = defineBreaks(simColPal(), lb = 0))
+annotatedHeatmap(mcmc_out[[6]]$psm[[4]], labels4, col_pal = simColPal(), my_breaks = defineBreaks(simColPal(), lb = 0))
+annotatedHeatmap(mcmc_out[[7]]$psm[[4]], labels4, col_pal = simColPal(), my_breaks = defineBreaks(simColPal(), lb = 0))
+annotatedHeatmap(mcmc_out[[8]]$psm[[4]], labels4, col_pal = simColPal(), my_breaks = defineBreaks(simColPal(), lb = 0))
 
-annotatedHeatmap(mditest4, mcmc_out[[1]]$predicted_clustering[[4]])
-annotatedHeatmap(mditest4, mcmc_out[[2]]$predicted_clustering[[4]])
-annotatedHeatmap(mditest4, mcmc_out[[3]]$predicted_clustering[[4]])
 
-annotatedHeatmap(mcmc_out[[1]]$psm[[4]], mcmc_out[[1]]$predicted_clustering[[4]], col_pal = simColPal(), my_breaks = defineBreaks(simColPal(), lb = 0))
-annotatedHeatmap(mcmc_out[[2]]$psm[[4]], mcmc_out[[2]]$predicted_clustering[[4]], col_pal = simColPal(), my_breaks = defineBreaks(simColPal(), lb = 0))
-annotatedHeatmap(mcmc_out[[3]]$psm[[4]], mcmc_out[[3]]$predicted_clustering[[4]], col_pal = simColPal(), my_breaks = defineBreaks(simColPal(), lb = 0))
 
-psms_v1 <- prepSimilarityMatricesForGGplot(psms[[1]])
-psms_v2 <- prepSimilarityMatricesForGGplot(psms[[2]])
-psms_v3 <- prepSimilarityMatricesForGGplot(psms[[3]])
-psms_v4 <- prepSimilarityMatricesForGGplot(psms[[4]])
+psms_v1 <- prepSimilarityMatricesForGGplot(psms[[1]], matrix_setting_order = 8)
+psms_v2 <- prepSimilarityMatricesForGGplot(psms[[2]], matrix_setting_order = 8)
+psms_v3 <- prepSimilarityMatricesForGGplot(psms[[3]], matrix_setting_order = 8)
+psms_v4 <- prepSimilarityMatricesForGGplot(psms[[4]], matrix_setting_order = 8)
 
 psms_v1$View <- 1
 psms_v2$View <- 2
@@ -164,30 +210,6 @@ psms_v1 |>
   facet_wrap(~Chain) + 
   scale_fill_gradient(low = "#FFFFFF", high = "#146EB4")
 
-mcclust::arandi(mcmc_out[[1]]$predicted_clustering[[1]], mcmc_out[[1]]$predicted_clustering[[2]])
-mcclust::arandi(mcmc_out[[2]]$predicted_clustering[[1]], mcmc_out[[2]]$predicted_clustering[[2]])
-mcclust::arandi(mcmc_out[[3]]$predicted_clustering[[1]], mcmc_out[[3]]$predicted_clustering[[2]])
-
-mcclust::arandi(mcmc_out[[1]]$predicted_clustering[[1]], mcmc_out[[1]]$predicted_clustering[[3]])
-mcclust::arandi(mcmc_out[[2]]$predicted_clustering[[1]], mcmc_out[[2]]$predicted_clustering[[3]])
-mcclust::arandi(mcmc_out[[3]]$predicted_clustering[[1]], mcmc_out[[3]]$predicted_clustering[[3]])
-
-mcclust::arandi(mcmc_out[[1]]$predicted_clustering[[1]], mcmc_out[[1]]$predicted_clustering[[4]])
-mcclust::arandi(mcmc_out[[2]]$predicted_clustering[[1]], mcmc_out[[2]]$predicted_clustering[[4]])
-mcclust::arandi(mcmc_out[[3]]$predicted_clustering[[1]], mcmc_out[[3]]$predicted_clustering[[4]])
-
-mcclust::arandi(mcmc_out[[1]]$predicted_clustering[[2]], mcmc_out[[1]]$predicted_clustering[[3]])
-mcclust::arandi(mcmc_out[[2]]$predicted_clustering[[2]], mcmc_out[[2]]$predicted_clustering[[3]])
-mcclust::arandi(mcmc_out[[3]]$predicted_clustering[[2]], mcmc_out[[3]]$predicted_clustering[[3]])
-
-mcclust::arandi(mcmc_out[[1]]$predicted_clustering[[2]], mcmc_out[[1]]$predicted_clustering[[4]])
-mcclust::arandi(mcmc_out[[2]]$predicted_clustering[[2]], mcmc_out[[2]]$predicted_clustering[[4]])
-mcclust::arandi(mcmc_out[[3]]$predicted_clustering[[2]], mcmc_out[[3]]$predicted_clustering[[4]])
-
-mcclust::arandi(mcmc_out[[1]]$predicted_clustering[[3]], mcmc_out[[1]]$predicted_clustering[[4]])
-mcclust::arandi(mcmc_out[[2]]$predicted_clustering[[3]], mcmc_out[[2]]$predicted_clustering[[4]])
-mcclust::arandi(mcmc_out[[3]]$predicted_clustering[[3]], mcmc_out[[3]]$predicted_clustering[[4]])
-
 ari_lst <- list()
 phi_lst <- list()
 for(ii in seq(1, n_files)) {
@@ -210,3 +232,4 @@ ari_lst[[3]] |> pheatmap(cluster_rows = FALSE, cluster_cols = FALSE)
 phi_lst[[1]] |> pheatmap(cluster_rows = FALSE, cluster_cols = FALSE)
 phi_lst[[2]] |> pheatmap(cluster_rows = FALSE, cluster_cols = FALSE)
 phi_lst[[3]] |> pheatmap(cluster_rows = FALSE, cluster_cols = FALSE)
+
