@@ -146,11 +146,14 @@ model_output_dir <- "./T_gondii/ConsensusClustering/" #
 plot_dir <- paste0(save_dir, "Plots/")
 # dir.create(plot_dir, showWarnings = FALSE)
 
-R <- 15000 #
+R <- 30000
 K <- 125
 
-cc_file <- paste0(save_dir, "CC_R_", R, "_K_", K, ".rds")
-cc_out <- readRDS(cc_file)
+file_dir <- "./T_gondii/Output//"
+files <- list.files(file_dir, pattern = "*V_2.rds", full.names = TRUE)
+n_files <- length(files)
+burn <- 10000
+V <- 2
 
 cat("\n=== Reading in files ===================================================")
 
@@ -192,44 +195,77 @@ lopit_data <- read.csv(lopit_file,
 data_modelled <- readRDS(paste0(inputdata_dir, "TGondiiMDI_K_125_input.rds"))
 datasets <- c("Cell_cycle", "RNA-seq", "LOPIT")
 
-# microarray_data <- data_modelled$data_modelled[[1]] |> 
-#   as_tibble()
-# rna_seq_data <- data_modelled$data_modelled[[2]] |> 
-#   as_tibble(rownames = "Gene")
 
-prediction_mat <- do.call(cbind, cc_out$predicted_partitions)
 
-# .alloc <- cc_out$allocations
-# cc_out$allocations <- array(NA, c(50, 3643, 3))
-# cc_out$allocations[, , 1] <- .alloc[[1]]
-# cc_out$allocations[, , 2] <- .alloc[[2]]
-# cc_out$allocations[, , 3] <- .alloc[[3]]
+# === READ IN MODEL OUTPUT =====================================================
 
-D <- nrow(cc_out$allocations)
-fused_gene_probs_12 <- colMeans(cc_out$allocations[[1]] == cc_out$allocations[[2]] )
-fused_genes_12 <- which(fused_gene_probs_12 > 0.5)
+prob_cl <- pred_cl <- psms <- ensemble_psms <- alloc_lst <- list()
+for(ii in seq(1, n_files)) {
+  f <- files[ii]
+  .x <- readRDS(f)[[1]]
+  .x <- processMCMCChain(.x, burn, construct_psm = TRUE)
+  # psms[[ii]] <- list()
+  pred_cl[[ii]] <- .x$pred
+  prob_cl[[ii]] <- .x$prob
+  alloc_lst[[ii]] <- list()
+  
+  for(v in seq(1, V)) {
+    # psms[[ii]][[v]] <- .x$psms[[v]]
+    .psm <- .x$psms[[v]]
+    alloc_lst[[ii]][[v]] <- .x$allocations[, , v]
+    if(ii == 1) {
+      ensemble_psms[[v]] <- .psm
+    } else {
+      ensemble_psms[[v]] <- ensemble_psms[[v]] + .psm
+    }
+  }
+  
+  phis <- .x$phis |> 
+    as.data.frame()
+  colnames(phis) <- c("Phi_12")
+  phis$Chain <- ii
+  phis$Iteration <- seq(.x$burn + .x$thin, .x$R, .x$thin) 
+  
+  if(ii == 1) {
+    phi_df <- phis
+  } else {
+    phi_df <- rbind(phi_df, phis)
+  }
+}
 
-fused_gene_probs_13 <- colMeans(cc_out$allocations[[1]] == cc_out$allocations[[3]])
-fused_genes_13 <- which(fused_gene_probs_13 > 0.5)
+for(v in seq(1, V)) {
+  ensemble_psms[[v]] <- ensemble_psms[[v]] / n_files
+}
 
-fused_gene_probs_23 <- colMeans(cc_out$allocations[[2]] == cc_out$allocations[[3]] )
-fused_genes_23 <- which(fused_gene_probs_23 > 0.5)
+phi_df |> 
+  pivot_longer(-c(Chain, Iteration), names_to = "Parameter", values_to = "Sampled_value") |> 
+  ggplot(aes(x = Parameter, y = Sampled_value)) +
+  geom_boxplot() +
+  facet_wrap(~Chain)
 
-prediction_mat[fused_genes_12, 3]
-c("nucelolus", "cytosol", "dense granules", "nucleus chromatim")
+which(colMeans(alloc_lst[[1]][[1]] == alloc_lst[[1]][[2]]) > 0.5)
+which(colMeans(alloc_lst[[2]][[1]] == alloc_lst[[2]][[2]]) > 0.5)
+which(colMeans(alloc_lst[[3]][[1]] == alloc_lst[[3]][[2]]) > 0.5)
+which(colMeans(alloc_lst[[4]][[1]] == alloc_lst[[4]][[2]]) > 0.5)
 
-data("Barylyuk2020ToxoLopit")
+fused_genes_1 <- which(colMeans(alloc_lst[[1]][[1]] == alloc_lst[[1]][[2]]) > 0.5)
+fused_genes_2 <- which(colMeans(alloc_lst[[2]][[1]] == alloc_lst[[2]][[2]]) > 0.5)
+fused_genes_3 <- which(colMeans(alloc_lst[[3]][[1]] == alloc_lst[[3]][[2]]) > 0.5)
+fused_genes_4 <- which(colMeans(alloc_lst[[4]][[1]] == alloc_lst[[4]][[2]]) > 0.5)
+
+# === VIsualise results =======================================================
+
 cols_used <- c("Description", "markers", "tagm.mcmc.allocation","tagm.mcmc.probability")
 
-proteins_modelled <- row.names(data_modelled$data_modelled[[3]])
+proteins_modelled <- row.names(data_modelled$data_modelled[[1]])
 tagm_comparison <- fData(Barylyuk2020ToxoLopit)[proteins_modelled, cols_used]
 
 label_to_organelle <- data.frame("Organelle" = levels(tagm_comparison$markers)[-27],
                                  "Label"= seq(1, 26)
 )
 
-mdi_predictions <- label_to_organelle$Organelle[cc_out$predicted_partitions[[3]]]
-mdi_probabilities <- cc_out$classification_probability
+mdi_predictions <- label_to_organelle$Organelle[pred_cl[[1]][[1]]]
+mdi_probabilities <- prob_cl[[1]][[1]] 
 
 tagm_comparison <- tagm_comparison[proteins_modelled,  ]
 # proteins_modelled <- which(row.names(tagm_comparison) %in% row.names(lopit_data))
@@ -240,7 +276,17 @@ tagm_comparison$mdi.mcmc.probability <- mdi_probabilities
 tagm_comparison |> head()
 lopit_data |> head()
 
-tagm_comparison[fused_genes_12, ] |> head()
+tagm_comparison[fused_genes_1, c(3, 5)] |> unique()
+tagm_comparison[fused_genes_2, c(3, 5)] |> unique()
+tagm_comparison[fused_genes_3, c(3, 5)] |> unique()
+tagm_comparison[fused_genes_4, c(3, 5)] |> unique()
+
+tagm_comparison[fused_genes_4[which(tagm_comparison[fused_genes_4, ]$mdi.mcmc.allocation != "19S proteasome")], 
+                c(3, 5)]
+
+tagm_comparison[fused_genes_2, c(2, 3, 5)] |> head()
+tagm_comparison[fused_genes_3, c(2, 3, 5)] |> head()
+tagm_comparison[fused_genes_4, c(2, 3, 5)] |> head()
 
 lopit_data$MDI_prediction <- mdi_predictions
 lopit_data$TAGM_prediction <- tagm_comparison$tagm.mcmc.allocation
@@ -267,6 +313,13 @@ lopit_plot_data <- lopit_data |>
   mutate(Model = case_when(Model == "MDI_prediction" ~ "MDI",
                            Model == "TAGM_prediction" ~ "TAGM")) 
 
+# These organelles are a lot noisier in MDI vs TAGM
+misbehaving_organelles <- c(
+  "dense granules",
+  "PM peripheral 2",
+  "tubulin cytoskeleton"
+)
+
 lopit_plot_data |> 
   ggplot(aes(x = Fraction, y = Measurement, group = Protein)) + 
   geom_line(alpha = 0.3) +
@@ -283,6 +336,7 @@ lopit_plot_data |>
   geom_line(alpha = 0.3) +
   ggforce::facet_grid_paginate(Organelle ~ Model, ncol = 2, nrow = 5, page = 3)
 
+# TAGM puts a lot more into the nulceus related organelles
 lopit_plot_data |> 
   ggplot(aes(x = Fraction, y = Measurement, group = Protein)) + 
   geom_line(alpha = 0.3) +
@@ -305,12 +359,12 @@ lopit_data |>
   ggplot(aes(x = Fraction, y = Measurement, group = Protein)) + 
   geom_line() +
   facet_grid(Organelle ~ Model)
-  
+
 
 lopit_data |> 
   pivot_longer(-c(Label, Fixed, Protein, MDI_prediction, TAGM_prediction), values_to = "Measurement", names_to = "Fraction") |> 
   mutate(Fraction = factor(Fraction)) |> 
-  pivot_longer(c(MDI_prediction, TAGM_prediction), names_to = "Model", values_to = "Organelle") |> 
+  pivot_longer(c(TAGM_prediction, MDI_prediction), names_to = "Model", values_to = "Organelle") |> 
   ggplot(aes(x = Fraction, y = Measurement, group = Protein, colour = Model)) + 
   geom_line(alpha = 0.3) +
   facet_wrap(~ Organelle) + 
@@ -318,22 +372,22 @@ lopit_data |>
 
 
 tagm_comparison[which(tagm_comparison$tagm.mcmc.allocation != tagm_comparison$mdi.mcmc.allocation), c(1, 3, 5)] |> 
-
-tagm_comparison[fused_genes_12, ]
+  
+  tagm_comparison[fused_genes_12, ]
 
 p_tagm_mdi_contrast <- lopit_data |> 
   pivot_longer(-c(Label, Fixed, Protein, MDI_prediction, TAGM_prediction), values_to = "Measurement", names_to = "Fraction") |> 
   mutate(Fraction = factor(Fraction)) |> 
-  pivot_longer(c(MDI_prediction, TAGM_prediction), names_to = "Model", values_to = "Organelle") |> 
+  pivot_longer(c(TAGM_prediction, MDI_prediction), names_to = "Model", values_to = "Organelle") |> 
   ggplot(aes(x = Fraction, y = Measurement, group = Protein, colour = Model)) + 
   geom_line(alpha = 0.3) +
   facet_wrap(~ Organelle) + 
   ggthemes::scale_color_colorblind()
 
-ggsave("./tagm_mdi_contrast.png", p_tagm_mdi_contrast)
+ggsave("./tagm_mdi_contrast_v_2.png", p_tagm_mdi_contrast)
 
 microarray_data |> 
-  mutate(Predicted_label = factor(cc_out$predicted_partitions[[2]]),
+  mutate(Predicted_label = factor(pred_cl[[4]][[2]]),
          Gene = row.names(microarray_data)) |> 
   pivot_longer(-c(Predicted_label, Gene), names_to = "Time", values_to = "Expression") |> 
   mutate(Time = factor(Time, labels = seq(0, 12))) |> 
@@ -343,41 +397,27 @@ microarray_data |>
   # ggthemes::scale_color_colorblind() + 
   facet_wrap(~Predicted_label)
 
-rna_seq_data |>
-  mutate(Predicted_label = factor(cc_out$predicted_partitions[[3]]),
-         Gene = row.names(rna_seq_data)) |>
-  pivot_longer(-c(Predicted_label, Gene), names_to = "Experiment", values_to = "Expression") |>
-  # mutate(Time = factor(Time, labels = seq(0, 12))) |>
-  # filter(Predicted_label %in% c(1:6, 9)) |>
-  ggplot(aes(x = Experiment, y = Expression, group = Gene)) +
-  geom_line(aes(color = Predicted_label)) +
-  # ggthemes::scale_color_colorblind() +
-  facet_wrap(~Predicted_label)
+annotatedHeatmap(microarray_data, pred_cl[[1]][[2]], 
+  show_colnames = FALSE, show_rownames = FALSE,
+  main = "RNA-seq data annotated by predicted cluster" # ,
+  # filename = "./rnaseq_predicted_clustering.png"
+)
 
-annotatedHeatmap(rna_seq_data, cc_out$predicted_partitions[[2]], 
+
+annotatedHeatmap(microarray_data[fused_genes_4, ], pred_cl[[1]][[2]][fused_genes_4], 
                  show_colnames = FALSE, show_rownames = FALSE,
                  main = "RNA-seq data annotated by predicted cluster" # ,
                  # filename = "./rnaseq_predicted_clustering.png"
-                 )
-
-
-clusters_bigger_50 <- which(table(cc_out$predicted_partitions[[1]]) > 50)
-genes_in_bigger_cl <- which(cc_out$predicted_partitions[[1]] %in% clusters_bigger_50)
-
-annotatedHeatmap(microarray_data[genes_in_bigger_cl, ], 
-                 cc_out$predicted_partitions[[1]][genes_in_bigger_cl], 
-                      show_colnames = FALSE, show_rownames = FALSE, cluster_cols = FALSE,
-                 main = "Cell cycle data annotated by predicted cluster (clusters with membership exceeding 50)",
-                 filename = "./cell_cycle_predicted_clustering.png")
+)
 
 marker_genes <- which(tagm_comparison$markers != "unknown")
 annotatedHeatmap(microarray_data[marker_genes, ], 
-                 cc_out$predicted_partitions[[1]][marker_genes], 
+                 pred_cl[[1]][[2]][marker_genes], 
                  show_colnames = FALSE, show_rownames = FALSE, cluster_cols = FALSE,
                  main = "Marker genes in cell cycle data")
 
 # Create the annotation data.frame for the rows
-anno_row <- data.frame(Cluster = factor(paste("Cluster", cc_out$predicted_partitions[[1]][marker_genes])),
+anno_row <- data.frame(Cluster = factor(paste("Cluster",  pred_cl[[1]][[2]][marker_genes])),
                        Organelle = tagm_comparison$mdi.mcmc.allocation[marker_genes]) %>%
   magrittr::set_rownames(rownames(microarray_data)[marker_genes])
 
@@ -386,7 +426,7 @@ anno_row <- data.frame(Cluster = factor(paste("Cluster", cc_out$predicted_partit
 
 # Create the annotation colours
 ann_colours <- list(Cluster = viridis::viridis(19), Organelle = viridis::viridis(26))
-names(ann_colours[[1]]) <- paste("Cluster", unique(cc_out$predicted_partitions[[1]][marker_genes]))
+names(ann_colours[[1]]) <- paste("Cluster", unique( pred_cl[[1]][[2]][marker_genes]))
 names(ann_colours[[2]]) <- unique(tagm_comparison$mdi.mcmc.allocation[marker_genes])
 pheatmap::pheatmap(microarray_data[marker_genes, ],
                    color = dataColPal(),
@@ -396,7 +436,7 @@ pheatmap::pheatmap(microarray_data[marker_genes, ],
                    show_rownames = FALSE,
                    show_colnames = FALSE,
                    main = "Genes of marker proteins in cell cycle data\nannotated by organelle and inferred cluster",
-                   filename = "./markger_genes_cell_cycle_data_comp.png"
+                   filename = "./marker_genes_cell_cycle_data_comp.png"
 )
 
 organelles_of_interest <- c("micronemes", 
@@ -511,10 +551,10 @@ heat_df |>
   scale_fill_gradient2(mid = "#FFFFFF", low = "#146EB4", high = "#FF9900")
 
 microarray_data <- fread("./T_gondii/Original_data/ToxoDB_TgME49_Protein-coding_DNA_microarray.txt",
-            na.strings = "N/A",
-            strip.white = T,
-            header = T,
-            select = seq(1, 212)
+                         na.strings = "N/A",
+                         strip.white = T,
+                         header = T,
+                         select = seq(1, 212)
 )
 
 rna_seq_data <- fread("./T_gondii/Original_data/ToxoDB_TgME49_Protein-coding_RNA-Seq.txt",

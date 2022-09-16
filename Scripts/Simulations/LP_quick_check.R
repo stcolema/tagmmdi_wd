@@ -8,7 +8,7 @@ set.seed(1)
 setMyTheme()
 
 my_dir <- "./Simulations/Output/"
-my_dirs <- list.dirs(my_dir, recursive = F)[c(1, 2 ,5)]
+my_dirs <- list.dirs(my_dir, recursive = F)
 
 files <- lapply(my_dirs, list.files, full.names = TRUE) |> unlist()
 # files <- list.files(my_dir, full.names = TRUE)
@@ -64,11 +64,16 @@ perf_df$Index <- factor(perf_df$Index)
 phi_df$Chain <- factor(phi_df$Chain)
 phi_df$Index <- factor(phi_df$Index)
 
-perf_df |> 
-  ggplot(aes(x = Model, y = ARI.test.labels, fill = Model)) +
+p_perf <- perf_df |> 
+  ggplot(aes(y = Model, x = ARI.test.labels, fill = Model)) +
   geom_boxplot() +
-  facet_grid(Scenario~View) +
-  ggthemes::scale_fill_colorblind()
+  facet_grid(Scenario~View, labeller = label_both) +
+  ggthemes::scale_fill_colorblind() +
+  labs(x = "ARI between inferred labels and truth") +
+  theme(legend.position = "none")
+  # theme(legend.position = "bottom")
+
+ggsave("./Simulations/Output/performance.png", p_perf, height = 6, width = 9)
 
 perf_df |> 
   ggplot(aes(x = Model, y = ARI.all.labels, fill = Model)) +

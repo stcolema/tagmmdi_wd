@@ -67,7 +67,7 @@ findFusedGenesAcrossAllViews <- function(mcmc, threshold = 0.5) {
   fused_genes
 }
 
-out_dir <- "./MDITestData/Output/UnsupervisedNaive/"
+out_dir <- "./MDITestData/Output/Unsupervised/"
 
 mditest1 <- read.csv("./MDITestData/MDItestdata1.csv", row.names = 1)
 mditest2 <- read.csv("./MDITestData/MDItestdata2.csv", row.names = 1)
@@ -111,7 +111,7 @@ files <- list.files(out_dir, pattern = "*rds", full.names = TRUE)
 n_files <- length(files)
 
 mcmc_out <- list()
-burn <- 5000
+burn <- 15000
 
 psms <- vector("list", 4)
 
@@ -180,7 +180,7 @@ across_chain$phis |>
 # +
   # facet_wrap(~Parameter, scales = "free_y")
 
-across_chain_psm_df <- tagmReDraft::prepSimilarityMatricesForGGplot(across_chain$psm, ylim = c(0, 40))
+across_chain_psm_df <- tagmReDraft::prepSimilarityMatricesForGGplot(across_chain$psm)
 
 phi_df |> 
   pivot_longer(-Chain, names_to = "Parameter", values_to = "Sampled_value") |> 
@@ -287,6 +287,8 @@ phi_df |>
   ggplot(aes(x = Sampled_value, y = Parameter, fill = Parameter)) +
   geom_boxplot() +
   facet_wrap(~ Chain, labeller = label_both)
+
+ggsave("./MDITestData/Output/Unsupervised/all_phis.png", width = 9, height = 6)
 
 phi_df |> 
   pivot_longer(-Chain, names_to = "Parameter", values_to = "Sampled_value") |> 
@@ -405,6 +407,8 @@ psm_df |>
         panel.background = element_rect(fill = "#FDF9DC", colour = "#FDF9DC")
   )
 
+ggsave("./MDITestData/Output/Unsupervised/all_psms.png", width = 9, height = 6)
+
 across_chain_psm_df$View <- across_chain_psm_df$Chain
 across_chain_psm_df |> 
   ggplot(aes(x = x, y= y, fill = Entry)) + 
@@ -431,30 +435,6 @@ psms_v1 |>
   facet_wrap(~Chain) + 
   scale_fill_gradient(low = "#FFFFFF", high = "#146EB4")
 
-mcclust::arandi(mcmc_out[[1]]$predicted_clustering[[1]], mcmc_out[[1]]$predicted_clustering[[2]])
-mcclust::arandi(mcmc_out[[2]]$predicted_clustering[[1]], mcmc_out[[2]]$predicted_clustering[[2]])
-mcclust::arandi(mcmc_out[[3]]$predicted_clustering[[1]], mcmc_out[[3]]$predicted_clustering[[2]])
-
-mcclust::arandi(mcmc_out[[1]]$predicted_clustering[[1]], mcmc_out[[1]]$predicted_clustering[[3]])
-mcclust::arandi(mcmc_out[[2]]$predicted_clustering[[1]], mcmc_out[[2]]$predicted_clustering[[3]])
-mcclust::arandi(mcmc_out[[3]]$predicted_clustering[[1]], mcmc_out[[3]]$predicted_clustering[[3]])
-
-mcclust::arandi(mcmc_out[[1]]$predicted_clustering[[1]], mcmc_out[[1]]$predicted_clustering[[4]])
-mcclust::arandi(mcmc_out[[2]]$predicted_clustering[[1]], mcmc_out[[2]]$predicted_clustering[[4]])
-mcclust::arandi(mcmc_out[[3]]$predicted_clustering[[1]], mcmc_out[[3]]$predicted_clustering[[4]])
-
-mcclust::arandi(mcmc_out[[1]]$predicted_clustering[[2]], mcmc_out[[1]]$predicted_clustering[[3]])
-mcclust::arandi(mcmc_out[[2]]$predicted_clustering[[2]], mcmc_out[[2]]$predicted_clustering[[3]])
-mcclust::arandi(mcmc_out[[3]]$predicted_clustering[[2]], mcmc_out[[3]]$predicted_clustering[[3]])
-
-mcclust::arandi(mcmc_out[[1]]$predicted_clustering[[2]], mcmc_out[[1]]$predicted_clustering[[4]])
-mcclust::arandi(mcmc_out[[2]]$predicted_clustering[[2]], mcmc_out[[2]]$predicted_clustering[[4]])
-mcclust::arandi(mcmc_out[[3]]$predicted_clustering[[2]], mcmc_out[[3]]$predicted_clustering[[4]])
-
-mcclust::arandi(mcmc_out[[1]]$predicted_clustering[[3]], mcmc_out[[1]]$predicted_clustering[[4]])
-mcclust::arandi(mcmc_out[[2]]$predicted_clustering[[3]], mcmc_out[[2]]$predicted_clustering[[4]])
-mcclust::arandi(mcmc_out[[3]]$predicted_clustering[[3]], mcmc_out[[3]]$predicted_clustering[[4]])
-
 ari_lst <- list()
 phi_lst <- list()
 for(ii in seq(1, n_files)) {
@@ -473,7 +453,20 @@ for(ii in seq(1, n_files)) {
 ari_lst[[1]] |> pheatmap(cluster_rows = FALSE, cluster_cols = FALSE)
 ari_lst[[2]] |> pheatmap(cluster_rows = FALSE, cluster_cols = FALSE)
 ari_lst[[3]] |> pheatmap(cluster_rows = FALSE, cluster_cols = FALSE)
+ari_lst[[4]] |> pheatmap(cluster_rows = FALSE, cluster_cols = FALSE)
+ari_lst[[5]] |> pheatmap(cluster_rows = FALSE, cluster_cols = FALSE)
+ari_lst[[6]] |> pheatmap(cluster_rows = FALSE, cluster_cols = FALSE)
+ari_lst[[7]] |> pheatmap(cluster_rows = FALSE, cluster_cols = FALSE)
+ari_lst[[8]] |> pheatmap(cluster_rows = FALSE, cluster_cols = FALSE)
+ari_lst[[9]] |> pheatmap(cluster_rows = FALSE, cluster_cols = FALSE)
 
 phi_lst[[1]] |> pheatmap(cluster_rows = FALSE, cluster_cols = FALSE)
 phi_lst[[2]] |> pheatmap(cluster_rows = FALSE, cluster_cols = FALSE)
 phi_lst[[3]] |> pheatmap(cluster_rows = FALSE, cluster_cols = FALSE)
+phi_lst[[4]] |> pheatmap(cluster_rows = FALSE, cluster_cols = FALSE)
+phi_lst[[5]] |> pheatmap(cluster_rows = FALSE, cluster_cols = FALSE)
+phi_lst[[6]] |> pheatmap(cluster_rows = FALSE, cluster_cols = FALSE)
+phi_lst[[7]] |> pheatmap(cluster_rows = FALSE, cluster_cols = FALSE)
+phi_lst[[8]] |> pheatmap(cluster_rows = FALSE, cluster_cols = FALSE)
+phi_lst[[9]] |> pheatmap(cluster_rows = FALSE, cluster_cols = FALSE)
+

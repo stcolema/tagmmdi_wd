@@ -4,6 +4,7 @@ library(mdiHelpR)
 library(magrittr)
 library(ggplot2)
 library(tidyr)
+RcppParallel::setThreadOptions()
 mdiHelpR::setMyTheme()
 set.seed(1)
 
@@ -76,18 +77,18 @@ burn <- 1500
 K_max <- 35
 K <- rep(K_max, V)
 
-# gp_mix_mod <- tagmReDraft::callMixtureModel(data_modelled[[1]],
-#                                R = 5000,
-#                                thin = 25,
-#                                type = "GP",
-#                                K = K[1]
-# )
-# 
-# psm_mix_mod <- gp_mix_mod$allocations |>
-#   createSimilarityMat() |>
-#   set_rownames(row.names(mditest1))
-# 
-# annotatedHeatmap(psm_mix_mod, labels, my_breaks = defineBreaks(simColPal(), lb = 0), col_pal = simColPal())
+gp_mix_mod <- tagmReDraft::callMixtureModel(data_modelled[[1]],
+                               R = 5000,
+                               thin = 25,
+                               type = "GP",
+                               K = 15
+)
+
+psm_mix_mod <- gp_mix_mod$allocations[-seq(1, 40), ] |>
+  createSimilarityMat() |>
+  set_rownames(row.names(mditest1))
+
+annotatedHeatmap(psm_mix_mod, labels, my_breaks = defineBreaks(simColPal(), lb = 0), col_pal = simColPal())
 
 gp_mix <- tagmReDraft::callMDI(
   data_modelled,

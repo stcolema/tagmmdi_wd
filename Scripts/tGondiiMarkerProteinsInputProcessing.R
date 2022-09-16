@@ -269,6 +269,9 @@ microarray_numeric_columns <- seq(4, ncol(cleaned_microarray_data))
 rna_mat <- log(as.matrix(cleaned_rna_seq_data[, ..rna_seq_numeric_columns]) + 1)
 microarray_mat <- as.matrix(cleaned_microarray_data[, ..microarray_numeric_columns])
 
+rnaseq_macrophages_infected_by_T_gondii_inds <- seq(85, 142)
+
+
 row.names(rna_mat) <- cleaned_rna_seq_data[[1]]
 row.names(microarray_mat) <- cleaned_microarray_data[[1]]
 

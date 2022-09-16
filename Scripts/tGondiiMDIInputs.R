@@ -226,47 +226,57 @@ rna_seq_data <- fread(rna_seq_file,
 
 mismatching_order <- any(microarray_data[, 1] != rna_seq_data[, 1])
 
+rna_rel_cols <- c(seq(1, 3), seq(88, 145))
+cell_cycle_cols <- c(seq(1, 3), seq(5, 17))
+
+strain_rna_data <- rna_seq_data[ , ..rna_rel_cols]
+cell_cycle_data <- microarray_data[, ..cell_cycle_cols] 
+
+rna_seq_numeric_columns <- seq(4, ncol(strain_rna_data))
+microarray_numeric_columns <- seq(4, ncol(cell_cycle_data))
+
+# Do not use the aynchronous reading
+# m_white_cell_cycle_inds <- seq(2, 14) # 27)
+
 if (mismatching_order) {
   stop("Rownames not matching.")
 }
 
 
 # Check that we have no NAs in the data
-nas_in_rna_seq <- any(apply(rna_seq_data, 2, function(x) {
+nas_in_rna_seq <- any(apply(strain_rna_data, 2, function(x) {
   any(is.na(x))
 }))
 
-columns_containing_nas_in_microarray <- apply(microarray_data, 2, function(x) {
+columns_containing_nas_in_microarray <- apply(cell_cycle_data, 2, function(x) {
   sum(is.na(x))
 })
 
-rows_containing_nas_in_microarray <- apply(microarray_data, 1, function(x) {
+rows_containing_nas_in_microarray <- apply(cell_cycle_data, 1, function(x) {
   sum(is.na(x))
 })
 
-# table(columns_containing_nas_in_microarray)
-# table(rows_containing_nas_in_microarray)
-
-which_rows_containing_nas_in_microarray <- which(apply(microarray_data, 1, function(x) {
+which_rows_containing_nas_in_microarray <- which(apply(cell_cycle_data, 1, function(x) {
   any(is.na(x))
 }))
 
-cleaned_microarray_data <- microarray_data[-which_rows_containing_nas_in_microarray, ]
+cleaned_microarray_data <- cell_cycle_data[-which_rows_containing_nas_in_microarray, ]
 
 remaining_genes <- cleaned_microarray_data[[1]]
-rna_genes <- rna_seq_data[[1]]
+# rna_genes <- rna_seq_data[[1]]
+# 
+# kept_rows <- which(rna_genes %in% remaining_genes) # match(remaining_genes, rna_genes)
+# cleaned_rna_seq_data <- rna_seq_data[kept_rows, ]
 
-kept_rows <- which(rna_genes %in% remaining_genes) # match(remaining_genes, rna_genes)
-cleaned_rna_seq_data <- rna_seq_data[kept_rows, ]
+# rna_mat_all <- log(as.matrix(rna_seq_data[, ..rna_seq_numeric_columns]) + 1)
+# microarray_mat <- as.matrix(cleaned_microarray_data[, ..microarray_numeric_columns])
 
-rna_seq_numeric_columns <- seq(4, ncol(cleaned_rna_seq_data))
-microarray_numeric_columns <- seq(4, ncol(cleaned_microarray_data))
+rna_mat_all <- log(as.matrix(strain_rna_data[ , -seq(1, 3)]) + 1)
+microarray_mat <- as.matrix(cleaned_microarray_data[ , -seq(1, 3)])
 
-rna_mat <- log(as.matrix(cleaned_rna_seq_data[, ..rna_seq_numeric_columns]) + 1)
-microarray_mat <- as.matrix(cleaned_microarray_data[, ..microarray_numeric_columns])
-
-row.names(rna_mat) <- cleaned_rna_seq_data[[1]]
-row.names(microarray_mat) <- cleaned_microarray_data[[1]]
+row.names(rna_mat_all) <- rna_seq_data[[1]]
+rna_mat <- rna_mat_all[remaining_genes, ]
+row.names(microarray_mat) <- remaining_genes
 
 protein_lst <- prepareMSObject(Barylyuk2020ToxoLopit, order_by_protein_name = TRUE)
 measurements <- colnames(protein_lst$X)
@@ -292,7 +302,7 @@ proteins_in_rna_data <- proteins_represented[proteins_in_rna_data_ind]
 genes_in_protein_data_ind <- which(remaining_genes %in% proteins_in_rna_data)
 genes_in_protein_data <- remaining_genes[genes_in_protein_data_ind]
 
-rna_reducced_mat <- rna_mat[genes_in_protein_data_ind, ]
+rna_reduced_mat <- rna_mat[genes_in_protein_data_ind, ]
 microarray_reduced_mat <- microarray_mat[genes_in_protein_data_ind, ]
 
 protein_lst_red <- protein_lst
@@ -337,29 +347,31 @@ if (mismatch_in_items) {
 # row.names(microarray_mat) <- row.names(rna_mat) <- gene_ids
 # fixed <- which(final_protein_df$Fixed == 1)
 
-# rna_reducced_mat
+# rna_reduced_mat
 # microarray_reduced_mat
 # protein_lst_red
 
-rnaseq_macrophages_infected_by_T_gondii_inds <- seq(85, 142)
-rnaseq_macrophages_infected_by_T_gondii <- rna_reducced_mat[, rnaseq_macrophages_infected_by_T_gondii_inds]
-nonunique_rnaseq_macrophages_infected_by_T_gondii <- rnaseq_macrophages_infected_by_T_gondii[, seq(26, 54)]
-unique_rnaseq_macrophages_infected_by_T_gondii <- rnaseq_macrophages_infected_by_T_gondii[, seq(1, 25)]
+# rnaseq_macrophages_infected_by_T_gondii_inds <- seq(85, 142)
+# rnaseq_macrophages_infected_by_T_gondii <- rna_reduced_mat[, rnaseq_macrophages_infected_by_T_gondii_inds]
+# nonunique_rnaseq_macrophages_infected_by_T_gondii <- rnaseq_macrophages_infected_by_T_gondii[, seq(26, 54)]
+# unique_rnaseq_macrophages_infected_by_T_gondii <- rnaseq_macrophages_infected_by_T_gondii[, seq(1, 25)]
+# 
+# normalised_rnaseq_macrophages_infected_by_T_gondii <- normaliseForCoexpression(rnaseq_macrophages_infected_by_T_gondii)
+# normalised_nonuinque_rnaseq_macrophages_infected_by_T_gondii <- normaliseForCoexpression(nonunique_rnaseq_macrophages_infected_by_T_gondii)
+# normalised_unique_rnaseq_macrophages_infected_by_T_gondii <- normaliseForCoexpression(unique_rnaseq_macrophages_infected_by_T_gondii)
 
-normalised_rnaseq_macrophages_infected_by_T_gondii <- normaliseForCoexpression(rnaseq_macrophages_infected_by_T_gondii)
-normalised_nonuinque_rnaseq_macrophages_infected_by_T_gondii <- normaliseForCoexpression(nonunique_rnaseq_macrophages_infected_by_T_gondii)
-normalised_unique_rnaseq_macrophages_infected_by_T_gondii <- normaliseForCoexpression(unique_rnaseq_macrophages_infected_by_T_gondii)
+normalised_rna_reduced_mat <- normaliseForCoexpression(rna_reduced_mat)
+normalised_microarray_reduced_mat <- normaliseForCoexpression(microarray_reduced_mat)
 
-
-# Do not use the aynchronous reading
-## m_white_cell_cycle_inds <- seq(1, 14) # 27)
-m_white_cell_cycle_inds <- seq(2, 14) # 27)
-m_white_cell_cycle <- microarray_reduced_mat[, m_white_cell_cycle_inds]
-m_white_cell_cycle_normalised <- m_white_cell_cycle %>%
-  t() %>%
-  scale() %>%
-  t() %>%
-  na.omit()
+# # Do not use the aynchronous reading
+# ## m_white_cell_cycle_inds <- seq(1, 14) # 27)
+# m_white_cell_cycle_inds <- seq(2, 14) # 27)
+# m_white_cell_cycle <- microarray_reduced_mat[, m_white_cell_cycle_inds]
+# m_white_cell_cycle_normalised <- m_white_cell_cycle %>%
+#   t() %>%
+#   scale() %>%
+#   t() %>%
+#   na.omit()
 
 final_protein_df <-  data.frame(protein_lst_red$X) %>%
   mutate(
@@ -370,26 +382,31 @@ final_protein_df <-  data.frame(protein_lst_red$X) %>%
 
 protein_mat <- protein_lst_red$X
 
-shortened_col_names <- normalised_rnaseq_macrophages_infected_by_T_gondii |> 
+shortened_col_names <- normalised_rna_reduced_mat |> 
   colnames() |>
   stringr::str_remove("Murine macrophages infected by 29 different strains of T. gondii - ") |> 
   stringr::str_remove(" \\(Tg 29strains inMouse RNA-Seq\\)") |> 
   stringr::str_remove("infected ")
 
-colnames(normalised_rnaseq_macrophages_infected_by_T_gondii) <- shortened_col_names
+colnames(normalised_rna_reduced_mat) <- shortened_col_names
 
+cell_cycle_colnames <- colnames(normalised_microarray_reduced_mat) |> 
+  stringr::str_remove("M.White Cell Cycle Microarray spline smoothed - ") |> 
+  stringr::str_remove(" \\(TgRH CellCycle Marray\\)")
 
-write.csv(m_white_cell_cycle_normalised, paste0(save_dir, "cellCycleNormalised.csv"))
-write.csv(normalised_rnaseq_macrophages_infected_by_T_gondii, paste0(save_dir, "rnaSeqMacrophage.csv"))
+colnames(normalised_microarray_reduced_mat) <- cell_cycle_colnames
+
+write.csv(normalised_microarray_reduced_mat, paste0(save_dir, "cellCycleNormalised.csv"))
+write.csv(normalised_rna_reduced_mat, paste0(save_dir, "rnaSeqMacrophage.csv"))
 write.csv(final_protein_df, paste0(save_dir, "LOPITreduced.csv"))
 
 data_modelled <- list(
   protein_mat,
-  m_white_cell_cycle_normalised,
-  normalised_rnaseq_macrophages_infected_by_T_gondii
+  normalised_microarray_reduced_mat,
+  normalised_rna_reduced_mat
 )
 
-N <- nrow(m_white_cell_cycle_normalised)
+N <- nrow(protein_mat)
 V <- length(data_modelled)
 
 initial_labels <- fixed <- matrix(0, nrow = N, ncol = V)
@@ -409,11 +426,11 @@ K <- c(
 train_inds <- which( final_protein_df$Fixed == 1)
 row_order <- findOrder(protein_mat[ train_inds, ])
 p_gg <- prepDataForggHeatmap(protein_mat[train_inds, ], row_order = row_order)
-rna_gg <- prepDataForggHeatmap(normalised_rnaseq_macrophages_infected_by_T_gondii[train_inds, ], row_order = row_order)
-microarray_gg <- prepDataForggHeatmap(m_white_cell_cycle_normalised[train_inds, ], row_order = row_order)
+rna_gg <- prepDataForggHeatmap(normalised_rna_reduced_mat[train_inds, ], row_order = row_order)
+microarray_gg <- prepDataForggHeatmap(normalised_microarray_reduced_mat[train_inds, ], row_order = row_order)
 
 p_gg$Dataset <- "hyperLOPIT"
-rna_gg$Dataset <- "Murine macrophages"
+rna_gg$Dataset <- "RNA-seq"
 microarray_gg$Dataset <- "Cell-cycle"
 
 gg_df <- rbind(p_gg, microarray_gg, rna_gg)
@@ -422,6 +439,8 @@ p_heatmap_comparison <- gg_df |>
   geom_tile() + 
   facet_wrap(~Dataset, scales = "free_x") + 
   scale_fill_gradient2(mid = "#FFFFFF", low = "#146EB4", high = "#FF9900")
+
+ggsave(paste0(save_dir, "markerProteinsInEachView.png"), p_heatmap_comparison)
 
 cat("\n\n=== INPUT PREPARED ================================================\n")
 

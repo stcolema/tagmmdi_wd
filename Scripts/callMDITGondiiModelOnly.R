@@ -43,7 +43,7 @@ input_arguments <- function() {
       help = "Number of MCMC chains to run [default= %default]",
       metavar = "numeric"
     ),
-    optparse::make_option(c("-K", "--K"),
+    optparse::make_option(c("-k", "--K"),
       type = "numeric",
       default = NULL,
       help = paste(
@@ -53,10 +53,19 @@ input_arguments <- function() {
       ),
       metavar = "numeric"
     ),
+    optparse::make_option(c("-v", "--V"),
+      type = "numeric",
+      default = 3,
+      help = paste(
+        "Number of views modelled in each dataset. Defaults to",
+        "[default= %default]."
+      ),
+      metavar = "numeric"
+    ),
     optparse::make_option(c("--save_dir"),
       type = "character",
       default = "./",
-      help = "Directory to save output to [default= %default]",
+      help = "Directory to save output to. Defaults to [default= %default]",
       metavar = "character"
     ),
     optparse::make_option(c("--data_file"),
@@ -97,8 +106,12 @@ K <- args$K
 # Number of clusters modelled in the categorical dataset
 n_clust_unsupervised <- K
 if (is.null(K)) {
-  n_clust_unsupervised <- 100
+  n_clust_unsupervised <- 125
 }
+
+# The number of views modelled
+V <- args$V
+view_inds <- seq(1, V)
 
 # Random seed used defining this fold
 seed <- args$seed
@@ -113,6 +126,8 @@ save_file <- paste0(
   n_clust_unsupervised,
   "_R_",
   R,
+  "_V_", 
+  V,
   ".rds"
 )
 
@@ -120,7 +135,6 @@ save_file <- paste0(
 set.seed(seed)
 
 mcmc_input <- readRDS(data_file)
-
 
 data_modelled <- mcmc_input$data_modelled
 initial_labels <- mcmc_input$initial_labels
@@ -130,22 +144,22 @@ K <- mcmc_input$K
 # The number of components is a little awkward as it is set in the
 # semi-supservised view but should be changeable elsewhere, so this slightly
 # hack-y solution handles that.
-unsupervised_changed <- (K[1] != n_clust_unsupervised) & (K[2] != n_clust_unsupervised)
+unsupervised_changed <- (K[2] != n_clust_unsupervised) & (K[3] != n_clust_unsupervised)
 if (unsupervised_changed) {
-  K[1] <- K[2] <- n_clust_unsupervised
+  K[2] <- K[3] <- n_clust_unsupervised
 }
 
 types <- mcmc_input$types
 
 cat("\n\n=== MODELLING =====================================================\n")
 
-mcmc_output <- runMCMCChains(data_modelled, n_chains,
+mcmc_output <- runMCMCChains(data_modelled[view_inds], n_chains,
   R = R,
   thin = thin,
-  initial_labels = initial_labels,
-  fixed = fixed,
-  K = K,
-  types = types
+  initial_labels = initial_labels[ , view_inds, drop = FALSE],
+  fixed = fixed[ , view_inds, drop = FALSE],
+  K = K[view_inds],
+  types = types[view_inds]
 )
 
 saveRDS(mcmc_output, file = save_file)

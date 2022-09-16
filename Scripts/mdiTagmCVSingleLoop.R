@@ -306,20 +306,20 @@ cvSingleFold <- function(MS_object, test.idx,
   classes_pres <- model_inputs$classes_pres
 
   # Create a data frame of the classes present and their associated number
-  class_key <- data.frame(Class = classes_pres, Key = 1:length(classes_pres))
+  class_key <- data.frame(Class = classes_pres,
+    Key = seq(1, length(classes_pres))
+  )
 
   cat("\nModel call.")
 
   # MDI
-  mcmc_chains <- runMCMCChains(
-    data_modelled,
-    n_chains,
-    num_iter,
-    thin,
-    initial_labels,
-    fixed,
-    types,
-    K
+  mcmc_chains <- runMCMCChains(data_modelled, n_chains,
+    R = num_iter,
+    thin = thin,
+    types = types,
+    initial_labels = initial_labels,
+    fixed = fixed,
+    K = K
   )
 
   cat("\nModel has been run.\nMake predictions.")
