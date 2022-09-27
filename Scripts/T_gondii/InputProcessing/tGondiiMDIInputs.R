@@ -1,10 +1,10 @@
 #!/usr/bin/Rscript
 # Summary: Creates 3 .csv files of the data modelled and an .rds file of all the
 # inputs for the MDI model in their appropriate format.
-# 
-# Example: Rscript tGondiiMDIInputs.R --K 125 --save_dir "./T_gondii/Output/" 
+#
+# Example: Rscript tGondiiMDIInputs.R --K 125 --save_dir "./T_gondii/Output/"
 #   --data_dir "./T_gondii/Original_data/"
-# 
+#
 # Author: Stephen Coleman
 suppressMessages(library(pRolocdata))
 suppressMessages(library(pRoloc))
@@ -41,11 +41,11 @@ setMyTheme()
 # #'  organelles back to the original naming.
 # #' @export
 # prepareMSObject <- function(MS_object) {
-#   
+#
 #   # Extract the LOPIT data and the organelles
 #   X <- Biobase::exprs(MS_object)
 #   organelles <- fData(MS_object)[, "markers"]
-#   
+#
 #   # Create a data frame of the classes present and their associated number;\
 #   # this can be used to map the numeric representation of the classes back to
 #   # an organelle
@@ -54,34 +54,34 @@ setMyTheme()
 #     Organelle = organelles_present,
 #     Key = 1:length(organelles_present)
 #   )
-#   
+#
 #   # Number of components modelled
 #   K <- length(organelles_present)
-#   
+#
 #   # Number of views modelled
 #   V <- 1
-#   
+#
 #   # Number of samples modelled
 #   N <- nrow(X)
-#   
+#
 #   # Prepare initial labels
 #   initial_labels <- fixed <- matrix(0, nrow = N, ncol = V)
-#   
+#
 #   # Fix training points, allow test points to move component
 #   fix_vec <- (organelles != "unknown") * 1
 #   fixed[, 1] <- fix_vec
-#   
+#
 #   # Assign initial labels
 #   initial_labels[, 1] <- class_key$Key[match(organelles, class_key$Organelle)]
-#   
+#
 #   # Any unknown labels are given an arbitrary value which will be reset in the
 #   # model call function.
 #   initial_labels[is.na(initial_labels)] <- 1
-#   
+#
 #   data_modelled <- list(
 #     X
 #   )
-#   
+#
 #   # Return the prepared objects
 #   list(
 #     X = X,
@@ -95,55 +95,54 @@ setMyTheme()
 # User inputs from command line
 input_arguments <- function() {
   option_list <- list(
-    
+
     # Convert all files in target destination (default is FALSE)
     optparse::make_option(c("--data_dir"),
-                          type = "character",
-                          help = "Path to the directory containing the data.",
-                          metavar = "character"
+      type = "character",
+      help = "Path to the directory containing the data.",
+      metavar = "character"
     ),
-    
     optparse::make_option(c("-K", "--K"),
-                          type = "numeric",
-                          default = NULL,
-                          help = paste(
-                            "Number of components modelled in each dataset. If a dataset is",
-                            "semi-supervised then the number of unique labels is modelled, if",
-                            "unsupervised we default to 50."
-                          ),
-                          metavar = "numeric"
+      type = "numeric",
+      default = NULL,
+      help = paste(
+        "Number of components modelled in each dataset. If a dataset is",
+        "semi-supervised then the number of unique labels is modelled, if",
+        "unsupervised we default to 50."
+      ),
+      metavar = "numeric"
     ),
     optparse::make_option(c("--save_dir"),
-                          type = "character",
-                          default = "./",
-                          help = "Directory to save output to [default= %default]",
-                          metavar = "character"
+      type = "character",
+      default = "./",
+      help = "Directory to save output to [default= %default]",
+      metavar = "character"
     )
   )
-  
-  
+
+
   opt_parser <- optparse::OptionParser(option_list = option_list)
   opt <- optparse::parse_args(opt_parser)
 }
 
 my_heatmap <- function(X, annotation_labels, cluster_rows = FALSE, cluster_cols = FALSE, ...) {
   organelles_present <- sort(unique(annotation_labels$Organelle))
-  
+
   K <- length(organelles_present)
   if (any(is.na(organelles_present))) {
     K <- K - 1
   }
-  
+
   ann_colours <- list("Organelle" = viridis::viridis(K))
   names(ann_colours$Organelle) <- factor(sort(levels(annotation_labels$Organelle)))
-  
+
   col_pal <- colorRampPalette(c("#146EB4", "white", "#FF9900"))(100)
-  
+
   my_breaks <- defineDataBreaks(X, col_pal, mid_point = 0)
   if (min(X) >= 0.0) {
     my_breaks <- defineDataBreaks(X, col_pal, mid_point = median(X))
   }
-  
+
   ordering <- c() # seq(1, nrow(X))
   for (org in organelles_present) {
     org_indices <- which(annotation_labels$Organelle == org)
@@ -153,20 +152,20 @@ my_heatmap <- function(X, annotation_labels, cluster_rows = FALSE, cluster_cols 
     }
     ordering <- c(ordering, org_indices)
   }
-  
+
   X <- X[ordering, ]
   annotation_labels <- annotation_labels[ordering, , drop = FALSE]
-  
+
   ph <- pheatmap(X,
-                 show_colnames = FALSE,
-                 show_rownames = FALSE,
-                 cluster_cols = cluster_cols,
-                 cluster_rows = cluster_rows,
-                 color = col_pal,
-                 breaks = my_breaks,
-                 annotation_row = annotation_labels,
-                 annotation_colors = ann_colours,
-                 ...
+    show_colnames = FALSE,
+    show_rownames = FALSE,
+    cluster_cols = cluster_cols,
+    cluster_rows = cluster_rows,
+    color = col_pal,
+    breaks = my_breaks,
+    annotation_row = annotation_labels,
+    annotation_colors = ann_colours,
+    ...
   )
   ph
 }
@@ -211,17 +210,17 @@ rna_seq_file <- paste0(data_dir, "ToxoDB_TgME49_Protein-coding_RNA-Seq.txt")
 data(Barylyuk2020ToxoLopit)
 
 microarray_data <- fread(microarray_file,
-                         na.strings = "N/A",
-                         strip.white = T,
-                         header = T,
-                         select = seq(1, 212)
+  na.strings = "N/A",
+  strip.white = T,
+  header = T,
+  select = seq(1, 212)
 )
 
 rna_seq_data <- fread(rna_seq_file,
-                      na.strings = "N/A",
-                      strip.white = T,
-                      header = T,
-                      select = seq(1, 255)
+  na.strings = "N/A",
+  strip.white = T,
+  header = T,
+  select = seq(1, 255)
 )
 
 mismatching_order <- any(microarray_data[, 1] != rna_seq_data[, 1])
@@ -229,8 +228,8 @@ mismatching_order <- any(microarray_data[, 1] != rna_seq_data[, 1])
 rna_rel_cols <- c(seq(1, 3), seq(88, 145))
 cell_cycle_cols <- c(seq(1, 3), seq(5, 17))
 
-strain_rna_data <- rna_seq_data[ , ..rna_rel_cols]
-cell_cycle_data <- microarray_data[, ..cell_cycle_cols] 
+strain_rna_data <- rna_seq_data[, ..rna_rel_cols]
+cell_cycle_data <- microarray_data[, ..cell_cycle_cols]
 
 rna_seq_numeric_columns <- seq(4, ncol(strain_rna_data))
 microarray_numeric_columns <- seq(4, ncol(cell_cycle_data))
@@ -264,15 +263,15 @@ cleaned_microarray_data <- cell_cycle_data[-which_rows_containing_nas_in_microar
 
 remaining_genes <- cleaned_microarray_data[[1]]
 # rna_genes <- rna_seq_data[[1]]
-# 
+#
 # kept_rows <- which(rna_genes %in% remaining_genes) # match(remaining_genes, rna_genes)
 # cleaned_rna_seq_data <- rna_seq_data[kept_rows, ]
 
 # rna_mat_all <- log(as.matrix(rna_seq_data[, ..rna_seq_numeric_columns]) + 1)
 # microarray_mat <- as.matrix(cleaned_microarray_data[, ..microarray_numeric_columns])
 
-rna_mat_all <- log(as.matrix(strain_rna_data[ , -seq(1, 3)]) + 1)
-microarray_mat <- as.matrix(cleaned_microarray_data[ , -seq(1, 3)])
+rna_mat_all <- log(as.matrix(strain_rna_data[, -seq(1, 3)]) + 1)
+microarray_mat <- as.matrix(cleaned_microarray_data[, -seq(1, 3)])
 
 row.names(rna_mat_all) <- rna_seq_data[[1]]
 rna_mat <- rna_mat_all[remaining_genes, ]
@@ -325,24 +324,24 @@ if (mismatch_in_items) {
 }
 
 # retained_rows <- match(genes_in_protein_data, cleaned_microarray_data$`Gene ID`)
-# 
+#
 # final_microarray_data <- cleaned_microarray_data[retained_rows, ]
 # final_rna_seq_data <- cleaned_rna_seq_data[retained_rows, ]
-# 
+#
 # final_protein_df <- protein_df[match(proteins_in_rna_data, protein_df$Protein), ]
-# 
+#
 # all_items_matching <- (all(final_protein_df$Protein == final_rna_seq_data$`Gene ID`) &
 #                          all(final_protein_df$Protein == final_microarray_data$`Gene ID`)
 # )
-# 
+#
 # if (!all_items_matching) {
 #   stop("There's a mismatch in the order / membership of genes represented.")
 # }
-# 
+#
 # rna_mat <- log(as.matrix(final_rna_seq_data[, ..rna_seq_numeric_columns]) + 1)
 # microarray_mat <- as.matrix(final_microarray_data[, ..microarray_numeric_columns])
 # protein_mat <- as.matrix(final_protein_df[, -c(31:33)])
-# 
+#
 # gene_ids <- row.names(final_protein_df)
 # row.names(microarray_mat) <- row.names(rna_mat) <- gene_ids
 # fixed <- which(final_protein_df$Fixed == 1)
@@ -355,7 +354,7 @@ if (mismatch_in_items) {
 # rnaseq_macrophages_infected_by_T_gondii <- rna_reduced_mat[, rnaseq_macrophages_infected_by_T_gondii_inds]
 # nonunique_rnaseq_macrophages_infected_by_T_gondii <- rnaseq_macrophages_infected_by_T_gondii[, seq(26, 54)]
 # unique_rnaseq_macrophages_infected_by_T_gondii <- rnaseq_macrophages_infected_by_T_gondii[, seq(1, 25)]
-# 
+#
 # normalised_rnaseq_macrophages_infected_by_T_gondii <- normaliseForCoexpression(rnaseq_macrophages_infected_by_T_gondii)
 # normalised_nonuinque_rnaseq_macrophages_infected_by_T_gondii <- normaliseForCoexpression(nonunique_rnaseq_macrophages_infected_by_T_gondii)
 # normalised_unique_rnaseq_macrophages_infected_by_T_gondii <- normaliseForCoexpression(unique_rnaseq_macrophages_infected_by_T_gondii)
@@ -373,7 +372,7 @@ normalised_microarray_reduced_mat <- normaliseForCoexpression(microarray_reduced
 #   t() %>%
 #   na.omit()
 
-final_protein_df <-  data.frame(protein_lst_red$X) %>%
+final_protein_df <- data.frame(protein_lst_red$X) %>%
   mutate(
     Protein = row.names(protein_lst_red$X),
     Label = factor(protein_lst_red$initial_labels[, 1]),
@@ -382,16 +381,16 @@ final_protein_df <-  data.frame(protein_lst_red$X) %>%
 
 protein_mat <- protein_lst_red$X
 
-shortened_col_names <- normalised_rna_reduced_mat |> 
+shortened_col_names <- normalised_rna_reduced_mat |>
   colnames() |>
-  stringr::str_remove("Murine macrophages infected by 29 different strains of T. gondii - ") |> 
-  stringr::str_remove(" \\(Tg 29strains inMouse RNA-Seq\\)") |> 
+  stringr::str_remove("Murine macrophages infected by 29 different strains of T. gondii - ") |>
+  stringr::str_remove(" \\(Tg 29strains inMouse RNA-Seq\\)") |>
   stringr::str_remove("infected ")
 
 colnames(normalised_rna_reduced_mat) <- shortened_col_names
 
-cell_cycle_colnames <- colnames(normalised_microarray_reduced_mat) |> 
-  stringr::str_remove("M.White Cell Cycle Microarray spline smoothed - ") |> 
+cell_cycle_colnames <- colnames(normalised_microarray_reduced_mat) |>
+  stringr::str_remove("M.White Cell Cycle Microarray spline smoothed - ") |>
   stringr::str_remove(" \\(TgRH CellCycle Marray\\)")
 
 colnames(normalised_microarray_reduced_mat) <- cell_cycle_colnames
@@ -415,7 +414,7 @@ fixed[, 1] <- final_protein_df$Fixed
 initial_labels[, 1] <- final_protein_df$Label
 
 # types <- c("MVN", "G", "TAGM")
-types <- c("TAGPM", "GP", "G")
+types <- c("TAGM", "GP", "G")
 
 K <- c(
   length(pRoloc::getMarkerClasses(Barylyuk2020ToxoLopit)),
@@ -423,8 +422,8 @@ K <- c(
   n_clust_unsupervised
 )
 
-train_inds <- which( final_protein_df$Fixed == 1)
-row_order <- findOrder(protein_mat[ train_inds, ])
+train_inds <- which(final_protein_df$Fixed == 1)
+row_order <- findOrder(protein_mat[train_inds, ])
 p_gg <- prepDataForggHeatmap(protein_mat[train_inds, ], row_order = row_order)
 rna_gg <- prepDataForggHeatmap(normalised_rna_reduced_mat[train_inds, ], row_order = row_order)
 microarray_gg <- prepDataForggHeatmap(normalised_microarray_reduced_mat[train_inds, ], row_order = row_order)
@@ -434,10 +433,10 @@ rna_gg$Dataset <- "RNA-seq"
 microarray_gg$Dataset <- "Cell-cycle"
 
 gg_df <- rbind(p_gg, microarray_gg, rna_gg)
-p_heatmap_comparison <- gg_df |> 
+p_heatmap_comparison <- gg_df |>
   ggplot(aes(x = x, y = y, fill = Entry)) +
-  geom_tile() + 
-  facet_wrap(~Dataset, scales = "free_x") + 
+  geom_tile() +
+  facet_wrap(~Dataset, scales = "free_x") +
   scale_fill_gradient2(mid = "#FFFFFF", low = "#146EB4", high = "#FF9900")
 
 ggsave(paste0(save_dir, "markerProteinsInEachView.png"), p_heatmap_comparison)
@@ -445,7 +444,7 @@ ggsave(paste0(save_dir, "markerProteinsInEachView.png"), p_heatmap_comparison)
 cat("\n\n=== INPUT PREPARED ================================================\n")
 
 mcmc_input <- list(
-  data_modelled = data_modelled, 
+  data_modelled = data_modelled,
   initial_labels = initial_labels,
   fixed = fixed,
   K = K,
