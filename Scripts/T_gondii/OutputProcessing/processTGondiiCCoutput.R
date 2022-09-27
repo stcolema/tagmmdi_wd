@@ -105,10 +105,16 @@ input_arguments <- function() {
     ),
 
     # Number of MCMC iterations
-    optparse::make_option(c("-R", "--R"),
+    optparse::make_option(c("-r", "--R"),
       type = "numeric",
-      default = 5000,
+      default = 12000L,
       help = "Number of iterations to run in each MCMC chain [default= %default]",
+      metavar = "numeric"
+    ),
+    optparse::make_option(c("-t", "--thin"),
+      type = "numeric",
+      default = 1000L,
+      help = "Number of iterations to thin each MCMC chain by [default= %default]",
       metavar = "numeric"
     ),
     optparse::make_option(c("-b", "--burn"),
@@ -122,16 +128,21 @@ input_arguments <- function() {
     ),
     optparse::make_option(c("-K", "--K"),
       type = "numeric",
-      default = 125,
-      help = "Number of components modelled in the unsupervised views.",
+      default = 125L,
+      help = "Number of components modelled in the unsupervised views. [default= %default]",
       metavar = "numeric"
     ),
-
     optparse::make_option(c("-v", "--V"),
       type = "numeric",
       default = 3L,
       help = "Number of views modelled.",
       metavar = "numeric"
+    ),
+    optparse::make_option(c("-p", "--plotting"),
+      type = "logical",
+      default = TRUE,
+      help = "Flag indicating if plotting should be performed. [default= %default]",
+      metavar = "logical"
     )
   )
 
@@ -156,12 +167,13 @@ dir.create(plot_dir, showWarnings = FALSE)
 
 R <- args$R # 5000 #
 K <- args$K # 125
-thin <- 1000
+thin <- args$thin
+
 V <- args$V
 pattern <- paste0("(TGondiiMDI).*\\_K_", K, "_R_", R, "_V_", V, ".rds$")
 # pattern <- paste0("(TGondii_RNAseq).*\\_K_", K, "_R_", R, "_type_G.rds$")
 
-output_file <- paste0(save_dir, "CC_R_", R, "_K_", K, "_V_", V,  ".rds")
+output_file <- paste0(save_dir, "CC_R_", R, "_K_", K, "_V_", V, ".rds")
 
 cat("\n=== Reading in files ===================================================")
 
@@ -170,7 +182,7 @@ files <- list.files(model_output_dir,
   full.names = TRUE
 )
 
-plotting <- FALSE
+plotting <- args$plotting
 plot_height <- 6
 plot_width <- 8
 
@@ -230,7 +242,7 @@ D <- max(D_considered)
 number_depths <- length(D_considered)
 
 W_considered <- c(5, 10, 20, 30, 35)
-# W_considered <- c(10, 20, 40, 60, 80, 100) 
+# W_considered <- c(10, 20, 40, 60, 80, 100)
 # W_considered <- c(floor(n_files / 4), floor(n_files / 2), n_files)
 W <- max(W_considered)
 number_chains <- length(W_considered)
@@ -348,7 +360,7 @@ for (ii in seq(1, number_chains)) {
 
   for (jj in seq(1, number_depths)) {
     curr_d <- D_considered[jj]
-    
+
     curr_cm_index <- which((models$Depth == curr_d) & (models$Width == curr_w)) # (ii - 1) * number_depths + jj
     for (v in view_inds) {
       .cm <- createSimilarityMat(matrix(allocations[[jj]][chains_used, , v], ncol = N))
@@ -366,7 +378,7 @@ for (ii in seq(1, number_chains)) {
       if (jj > 1) {
         comparison_d <- D_considered[jj - 1]
         comparison_cm_index <- which((models$Depth == comparison_d) & (models$Width == curr_w))
-        
+
         # mean_absolute_difference[[v]] <-
         mad <- mean(abs(cms[[v]][[curr_cm_index]] - cms[[v]][[comparison_cm_index]]))
         mad_entry <- data.frame(
@@ -423,7 +435,7 @@ for (jj in seq(1, number_depths)) {
 cat("\n === Plotting =========================================================")
 
 cell_cycle_cm_df <- prepCMssForGGplot(cms[[2]], models, matrix_setting_order = n_models)
-if(V == 3) {
+if (V == 3) {
   rna_seq_cm_df <- prepCMssForGGplot(cms[[3]], models, matrix_setting_order = n_models)
 }
 lopit_cm_df <- prepCMssForGGplot(cms[[1]], models, matrix_setting_order = n_models)
@@ -570,7 +582,7 @@ output$classification_probability <- classification_probability[[n_models]]
 output$predicted_partitions <- vector("list", V)
 output$cms <- vector("list", V)
 output$allocations <- vector("list", V)
-for(v in view_inds) {
+for (v in view_inds) {
   output$predicted_partitions[[v]] <- predicted_partitions[[v]][[n_models]]
   output$cms[[v]] <- cms[[v]][[n_models]]
   output$allocations[[v]] <- allocations[[number_depths]][chains_used, , v]
