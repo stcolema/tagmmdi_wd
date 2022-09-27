@@ -54,7 +54,7 @@ input_arguments <- function() {
     ),
     optparse::make_option(c("--type"),
       type = "character",
-      default = "MVN",
+      default = "GP",
       help = "Choice of density in the mixture model. [default= %default]",
       metavar = "character"
     ),
@@ -140,13 +140,16 @@ fixed <- mcmc_input$fixed[, cell_cycle_ind, drop = FALSE]
 
 cat("\n\n=== MODELLING =====================================================\n")
 
+proposal_windows <- list(c(0.6, 0.8, 0.2))
+
 mcmc_output <- runMCMCChains(data_modelled, n_chains,
   R = R,
   thin = thin,
   initial_labels = initial_labels,
   fixed = fixed,
   K = K,
-  types = types
+  types = types,
+  proposal_windows = proposal_windows
 )
 
 saveRDS(mcmc_output, file = save_file)
@@ -155,6 +158,20 @@ cat("\n\n=== SCRIPT COMPLETE ===============================================\n")
 
 t1 <- Sys.time()
 time_taken <- t1 - t0
+
+for(ii in seq(1, n_chains)) {
+  if(ii == 1) {
+    acceptance_mat <- mcmc_output[[ii]]$acceptance_count[[1]]
+  } else {
+    acceptance_mat <- cbind(acceptance_mat,
+      mcmc_output[[ii]]$acceptance_count[[1]]
+    )
+  }
+}
+
+png(paste0(save_dir, "CellCycleAcceptanceRates.png"))
+boxplot(acceptance_mat, main = "T. Gondii: Cell cycle acceptance rate")
+dev.off()
 
 cat("\nSaving output to:\n", save_file)
 cat("\n\nTIME TAKEN:", round(time_taken, 2), attr(time_taken, "units"))

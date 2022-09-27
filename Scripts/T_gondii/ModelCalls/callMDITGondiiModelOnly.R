@@ -1,11 +1,10 @@
 #!/usr/bin/Rscript
-# Name: callTAGMTGondii.R
 # Summary: Runs MDI using the output of ``tGondiiMDIInputs.R``, a microarray
 # cell cycle dataset, some RNA-seq data and the LOPIT data. the first two are
 # unsupervised modelled using MVN densities locally. The LOPIT data is modelled
 # using a TAGM model and is semi-supservised.
 #
-# Example: Rscript callTAGMTGondiiModelOnly.R --R 25000 --thin 50 --seed 1
+# Example: Rscript callMDITGondiiModelOnly.R --R 25000 --thin 50 --seed 1
 #   --K 125 --save_dir "./" --data_file "./TGondiiMDI_seed_1_K_125.rds"
 #
 # Author: Stephen Coleman
@@ -13,7 +12,6 @@ suppressMessages(library(pRolocdata))
 suppressMessages(library(pRoloc))
 suppressMessages(library(tagmReDraft))
 suppressMessages(library(optparse))
-suppressMessages(library(RcppParallel))
 
 
 # User inputs from command line
@@ -45,10 +43,29 @@ input_arguments <- function() {
       help = "Number of MCMC chains to run [default= %default]",
       metavar = "numeric"
     ),
+    optparse::make_option(c("-k", "--K"),
+      type = "numeric",
+      default = NULL,
+      help = paste(
+        "Number of components modelled in each dataset. If a dataset is",
+        "semi-supervised then the number of unique labels is modelled, if",
+        "unsupervised we default to 50."
+      ),
+      metavar = "numeric"
+    ),
+    optparse::make_option(c("-v", "--V"),
+      type = "numeric",
+      default = 3,
+      help = paste(
+        "Number of views modelled in each dataset. Defaults to",
+        "[default= %default]."
+      ),
+      metavar = "numeric"
+    ),
     optparse::make_option(c("--save_dir"),
       type = "character",
       default = "./",
-      help = "Directory to save output to [default= %default]",
+      help = "Directory to save output to. Defaults to [default= %default]",
       metavar = "character"
     ),
     optparse::make_option(c("--data_file"),
@@ -69,9 +86,6 @@ cat("\n\n=== PASS INPUTS ===================================================\n")
 
 t0 <- Sys.time()
 
-# Set the number of threads
-setThreadOptions(numThreads = "auto", stackSize = "auto")
-
 # Pass the inputs from the command line
 args <- input_arguments()
 
@@ -86,17 +100,34 @@ thin <- args$thin
 # Number of chains modelled
 n_chains <- args$n_chains
 
+# The number of components modelled
+K <- args$K
+
+# Number of clusters modelled in the categorical dataset
+n_clust_unsupervised <- K
+if (is.null(K)) {
+  n_clust_unsupervised <- 125
+}
+
+# The number of views modelled
+V <- args$V
+view_inds <- seq(1, V)
+
 # Random seed used defining this fold
 seed <- args$seed
 
 # Output saved to
 save_file <- paste0(
   save_dir,
-  "TGondii_TAGPM_",
+  "TGondiiMDI_",
   "seed_",
   seed,
+  "_K_",
+  n_clust_unsupervised,
   "_R_",
   R,
+  "_V_", 
+  V,
   ".rds"
 )
 
@@ -105,22 +136,38 @@ set.seed(seed)
 
 mcmc_input <- readRDS(data_file)
 
-lopit_ind <- 1
-data_modelled <- list(mcmc_input$data_modelled[[lopit_ind]])
-initial_labels <- mcmc_input$initial_labels[, lopit_ind, drop = FALSE]
-fixed <- mcmc_input$fixed[, lopit_ind, drop = FALSE]
-K <- mcmc_input$K[lopit_ind]
-types <- "TAGPM"
+data_modelled <- mcmc_input$data_modelled
+initial_labels <- mcmc_input$initial_labels
+fixed <- mcmc_input$fixed
+K <- mcmc_input$K
+
+# The number of components is a little awkward as it is set in the
+# semi-supservised view but should be changeable elsewhere, so this slightly
+# hack-y solution handles that.
+unsupervised_changed <- (K[2] != n_clust_unsupervised) & (K[3] != n_clust_unsupervised)
+if (unsupervised_changed) {
+  K[2] <- K[3] <- n_clust_unsupervised
+}
+
+types <- mcmc_input$types
+types <- c("TAGM", "GP", "G")
+
+proposal_windows <- list(NULL,
+  c(0.6, 0.8, 0.2),
+  NULL
+)
+
 
 cat("\n\n=== MODELLING =====================================================\n")
 
-mcmc_output <- runMCMCChains(data_modelled, n_chains,
+mcmc_output <- runMCMCChains(data_modelled[view_inds], n_chains,
   R = R,
   thin = thin,
-  initial_labels = initial_labels,
-  fixed = fixed,
-  K = K,
-  types = types
+  initial_labels = initial_labels[ , view_inds, drop = FALSE],
+  fixed = fixed[ , view_inds, drop = FALSE],
+  K = K[view_inds],
+  types = types[view_inds],
+  proposal_windows = proposal_windows[view_inds]
 )
 
 saveRDS(mcmc_output, file = save_file)

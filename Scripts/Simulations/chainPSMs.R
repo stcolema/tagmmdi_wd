@@ -38,7 +38,6 @@ comparePSMsAcrossChains <- function(mcmc,
   psm_df
 }
 
-
 data_dir <- "./Simulations/Output/"
 scenarios <- list.dirs(data_dir, recursive = FALSE, full.names = FALSE)
 n_scn <- length(scenarios)

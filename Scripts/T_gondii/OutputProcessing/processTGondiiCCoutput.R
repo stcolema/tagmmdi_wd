@@ -126,6 +126,13 @@ input_arguments <- function() {
       default = 125,
       help = "Number of components modelled in the unsupervised views.",
       metavar = "numeric"
+    ),
+
+    optparse::make_option(c("-v", "--V"),
+      type = "numeric",
+      default = 3L,
+      help = "Number of views modelled.",
+      metavar = "numeric"
     )
   )
 
@@ -148,10 +155,12 @@ dir.create(plot_dir, showWarnings = FALSE)
 
 R <- args$R # 5000 #
 K <- args$K # 125
-pattern <- paste0("(TGondiiMDI).*\\_K_", K, "_R_", R, ".rds$")
+thin <- 1000
+V <- args$V
+pattern <- paste0("(TGondiiMDI).*\\_K_", K, "_R_", R, "_V_", V, ".rds$")
 # pattern <- paste0("(TGondii_RNAseq).*\\_K_", K, "_R_", R, "_type_G.rds$")
 
-output_file <- paste0(save_dir, "CC_R_", R, "_K_", K, ".rds")
+output_file <- paste0(save_dir, "CC_R_", R, "_K_", K, "_V_", V,  ".rds")
 
 cat("\n=== Reading in files ===================================================")
 
@@ -210,15 +219,18 @@ datasets <- c("Cell_cycle", "RNA-seq", "LOPIT")
 cat("\n# === Processing and input data =======================================")
 
 N <- nrow(microarray_data)
-V <- length(data_modelled$data_modelled)
+# V <- length(data_modelled$data_modelled)
 view_inds <- seq(1, V)
-lopit_ind <- which(data_modelled$types == "TAGPM")
+lopit_ind <- 1 # which(data_modelled$types == "TAGPM")
 
-D_considered <- c(1000, 3000, 5000, 8000, 12000)
+D_considered <- seq(thin, R, thin * 2)
+# D_considered <- c(1000, 3000, 5000, 8000, 12000)
 D <- max(D_considered)
 number_depths <- length(D_considered)
 
-W_considered <- c(floor(n_files / 4), floor(n_files / 2), n_files)
+W_considered <- c(5, 10, 20, 30, 35)
+# W_considered <- c(10, 20, 40, 60, 80, 100) 
+# W_considered <- c(floor(n_files / 4), floor(n_files / 2), n_files)
 W <- max(W_considered)
 number_chains <- length(W_considered)
 
@@ -226,7 +238,6 @@ models <- expand.grid(D_considered, W_considered)
 colnames(models) <- c("Depth", "Width")
 n_models <- nrow(models)
 
-thin <- 1000
 iterations <- seq(0, D, thin)
 
 allocation_list <- consensus_chains <- vector("list", W)
@@ -246,8 +257,13 @@ for (ii in seq(1, number_depths)) {
   }
 }
 
+cat("\nNumber of components in each view:\n", data_modelled$K)
+
 # account for saving of 0th iterations
 samples_extracted <- (D_considered / thin) + 1
+
+n_phis <- choose(V, 2)
+phi_names <- c("Phi_12", "Phi_13", "Phi_23")[seq(1, n_phis)]
 
 for (ii in seq(1, n_files)) {
   .f <- files[ii]
@@ -274,7 +290,7 @@ for (ii in seq(1, n_files)) {
     .phi_df <- .phis %>%
       t() %>%
       data.frame() %>%
-      set_colnames(c("Phi_12", "Phi_13", "Phi_23")) %>%
+      set_colnames(phi_names) %>%
       mutate(Chain = ii, Depth = curr_d)
 
     .mass_entry <- as.data.frame(t(.mass)) %>%
@@ -405,9 +421,11 @@ for (jj in seq(1, number_depths)) {
 # === Plotting =================================================================
 cat("\n === Plotting =========================================================")
 
-cell_cycle_cm_df <- prepCMssForGGplot(cms[[1]], models, matrix_setting_order = n_models)
-rna_seq_cm_df <- prepCMssForGGplot(cms[[2]], models, matrix_setting_order = n_models)
-lopit_cm_df <- prepCMssForGGplot(cms[[3]], models, matrix_setting_order = n_models)
+cell_cycle_cm_df <- prepCMssForGGplot(cms[[2]], models, matrix_setting_order = n_models)
+if(V == 3) {
+  rna_seq_cm_df <- prepCMssForGGplot(cms[[3]], models, matrix_setting_order = n_models)
+}
+lopit_cm_df <- prepCMssForGGplot(cms[[1]], models, matrix_setting_order = n_models)
 
 cat("\nCMs prepared.")
 
