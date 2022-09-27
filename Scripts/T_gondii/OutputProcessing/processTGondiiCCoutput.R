@@ -3,7 +3,6 @@
 # Example call:
 #  Rscript processTGondiiCCoutput.R --data_dir ~/rds/hpc-work/tagmmdi/T_gondii/Data/ --save_dir ~/rds/hpc-work/tagmmdi/T_gondii/ConsensusClustering/ --model_output_dir ~/rds/hpc-work/tagmmdi/T_gondii/ConsensusClustering/ --R 5000 --K 125
 
-
 suppressMessages(library(pRolocdata))
 suppressMessages(library(pRoloc))
 suppressMessages(library(ggplot2))
@@ -141,6 +140,8 @@ input_arguments <- function() {
 }
 
 cat("\n=== Running ``processTGondiiCCoutput.R`` ===============================")
+
+t0 <- Sys.time()
 setMyTheme()
 
 args <- input_arguments()
@@ -213,7 +214,7 @@ lopit_data <- read.csv(lopit_file,
 )
 
 data_modelled <- readRDS(paste0(inputdata_dir, "TGondiiMDI_K_125_input.rds"))
-datasets <- c("Cell_cycle", "RNA-seq", "LOPIT")
+datasets <- c("LOPIT", "Cell_cycle", "RNA-seq")
 
 # === Processing and input data ================================================
 cat("\n# === Processing and input data =======================================")
@@ -221,7 +222,7 @@ cat("\n# === Processing and input data =======================================")
 N <- nrow(microarray_data)
 # V <- length(data_modelled$data_modelled)
 view_inds <- seq(1, V)
-lopit_ind <- 1 # which(data_modelled$types == "TAGPM")
+lopit_ind <- 1 # which(data_modelled$types == "TAGM")
 
 D_considered <- seq(thin, R, thin * 2)
 # D_considered <- c(1000, 3000, 5000, 8000, 12000)
@@ -578,3 +579,7 @@ for(v in view_inds) {
 saveRDS(output, file = output_file)
 
 cat("\n# === SCRIPT COMPLETED ================================================")
+t1 <- Sys.time()
+time_taken <- t1 - t0
+
+cat("\n\nTIME TAKEN:", round(time_taken, 2), attr(time_taken, "units"))
