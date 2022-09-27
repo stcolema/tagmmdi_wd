@@ -355,10 +355,10 @@ for (ii in seq(1, number_chains)) {
       row.names(.cm) <- colnames(.cm) <- row.names(microarray_data)
       cms[[v]][[curr_cm_index]] <- .cm
 
-      if (v != 3) {
+      if (v != lopit_ind) {
         predicted_partitions[[v]][[curr_cm_index]] <- mcclust::maxpear(.cm)$cl
       } else {
-        .alloc_prob <- ccCalcAllocProbs(allocation_probs[[jj]], view = 3)
+        .alloc_prob <- ccCalcAllocProbs(allocation_probs[[jj]], view = lopit_ind)
         classification_probability[[curr_cm_index]] <- apply(.alloc_prob, 1, max)
         predicted_partitions[[v]][[curr_cm_index]] <- apply(.alloc_prob, 1, which.max)
       }
@@ -456,8 +456,8 @@ if (plotting) {
     facet_grid(Depth ~ Variable) + # , ncol = 1, scales = "free") +
     ggthemes::scale_fill_colorblind() +
     labs(
-      title = "Sampled mass parameter across different chain depths",
-      caption = "Dataset 1 is the cell cycle data, 2 is the RNA-seq data and 3 is the LOPIT data"
+      title = "Sampled mass parameter across different chain depths"
+      # caption = "Dataset 1 is the cell cycle data, 2 is the RNA-seq data and 3 is the LOPIT data"
     )
 
   ggsave(paste0(plot_dir, "sampled_alphas_across_depths.png"),
