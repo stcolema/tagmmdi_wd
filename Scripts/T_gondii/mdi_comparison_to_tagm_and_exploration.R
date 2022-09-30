@@ -304,6 +304,7 @@ lopit_plot_data |>
   geom_line(alpha = 0.3) +
   ggforce::facet_grid_paginate(Organelle ~ Model, ncol = 2, nrow = 5, page = 2)
 
+# MDI puts a lot into GOLGI
 lopit_plot_data |>
   ggplot(aes(x = Fraction, y = Measurement, group = Protein)) +
   geom_line(alpha = 0.3) +
@@ -698,7 +699,7 @@ combinePheatmaps(list(p_occ_mdi$gtable, p_occ_mix$gtable), save_name = "~/Deskto
 model_output$Cell_cycle$pred[[1]] |> table()
 model_output$MDI$pred[[2]] |> table()
 
-cl_14 <- which(model_output$MDI$pred[[2]] == 14)
+cl_14 <- which(pred_cl[[2]] == 14)
 
 model_output$Cell_cycle$pred[[1]][cl_14]
 model_output$MDI$pred[[2]][cl_14]
@@ -718,16 +719,16 @@ pred_cell_cycle |>
   pheatmap(cluster_rows = TRUE, 
     cluster_cols = FALSE, 
     main = "Fraction of mixture model clusters in MDI clusters",
-    color = simColPal(), 
-    filename = "~/Desktop/cellCycleMDIMixtureOverlap.png"
+    color = simColPal() #,
+    # filename = "~/Desktop/cellCycleMDIMixtureOverlap.png"
   )
 
 annotatedHeatmap(microarray_data[cl_14[cl_14_order], ], model_output$Cell_cycle$pred[[1]][cl_14][cl_14_order],
   cluster_cols = FALSE,
   show_colnames = FALSE,
   show_rownames = FALSE,
-  main = "Cell-cycle data\nCluster 14 from MDI annotated by predicted cluster in mixture model",
-  filename = "~/Desktop/cellCycleMDIclust14AnnotatedMixLabels.png"
+  main = "Cell-cycle data\nCluster 14 from MDI annotated by predicted cluster in mixture model" #,
+  # filename = "~/Desktop/cellCycleMDIclust14AnnotatedMixLabels.png"
 )
 
 annotatedHeatmap(microarray_data[cl_mix_in_14, ], model_output$MDI$pred[[2]][cl_mix_in_14],

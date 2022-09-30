@@ -134,6 +134,8 @@ input_arguments <- function() {
 }
 
 cat("\n=== Running ``processTGondiiCCoutput.R`` ===============================")
+
+t0 <- Sys.time()
 setMyTheme()
 
 args <- input_arguments()
@@ -146,10 +148,11 @@ model_output_dir <- "./T_gondii/ConsensusClustering/" #
 plot_dir <- paste0(save_dir, "Plots/")
 # dir.create(plot_dir, showWarnings = FALSE)
 
-R <- 15000 #
+R <- 12000 #
 K <- 125
 
 cc_file <- paste0(save_dir, "CC_R_", R, "_K_", K, ".rds")
+cc_file <- "~/Desktop/CC_R_12000_K_125_V_2.rds"
 cc_out <- readRDS(cc_file)
 
 cat("\n=== Reading in files ===================================================")
@@ -190,7 +193,7 @@ lopit_data <- read.csv(lopit_file,
 )
 
 data_modelled <- readRDS(paste0(inputdata_dir, "TGondiiMDI_K_125_input.rds"))
-datasets <- c("Cell_cycle", "RNA-seq", "LOPIT")
+datasets <- c("LOPIT", "Cell_cycle", "RNA-seq")
 
 # microarray_data <- data_modelled$data_modelled[[1]] |> 
 #   as_tibble()
@@ -215,20 +218,20 @@ fused_genes_13 <- which(fused_gene_probs_13 > 0.5)
 fused_gene_probs_23 <- colMeans(cc_out$allocations[[2]] == cc_out$allocations[[3]] )
 fused_genes_23 <- which(fused_gene_probs_23 > 0.5)
 
-prediction_mat[fused_genes_12, 3]
+prediction_mat[fused_genes_12, ]
 c("nucelolus", "cytosol", "dense granules", "nucleus chromatim")
 
 data("Barylyuk2020ToxoLopit")
 cols_used <- c("Description", "markers", "tagm.mcmc.allocation","tagm.mcmc.probability")
 
-proteins_modelled <- row.names(data_modelled$data_modelled[[3]])
+proteins_modelled <- row.names(data_modelled$data_modelled[[1]])
 tagm_comparison <- fData(Barylyuk2020ToxoLopit)[proteins_modelled, cols_used]
 
 label_to_organelle <- data.frame("Organelle" = levels(tagm_comparison$markers)[-27],
                                  "Label"= seq(1, 26)
 )
 
-mdi_predictions <- label_to_organelle$Organelle[cc_out$predicted_partitions[[3]]]
+mdi_predictions <- label_to_organelle$Organelle[cc_out$predicted_partitions[[1]]]
 mdi_probabilities <- cc_out$classification_probability
 
 tagm_comparison <- tagm_comparison[proteins_modelled,  ]

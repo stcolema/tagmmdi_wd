@@ -107,7 +107,7 @@ input_arguments <- function() {
     # Number of MCMC iterations
     optparse::make_option(c("-r", "--R"),
       type = "numeric",
-      default = 12000L,
+      default = 15000L,
       help = "Number of iterations to run in each MCMC chain [default= %default]",
       metavar = "numeric"
     ),
@@ -236,12 +236,12 @@ N <- nrow(microarray_data)
 view_inds <- seq(1, V)
 lopit_ind <- 1 # which(data_modelled$types == "TAGM")
 
-D_considered <- seq(thin, R, thin * 2)
+D_considered <- seq(3000, 15000, 3000) # seq(thin, R, thin * 2)
 # D_considered <- c(1000, 3000, 5000, 8000, 12000)
 D <- max(D_considered)
 number_depths <- length(D_considered)
 
-W_considered <- c(5, 10, 20, 30, 35)
+W_considered <- c(25, 50, 75, 100, 125, 150)
 # W_considered <- c(10, 20, 40, 60, 80, 100)
 # W_considered <- c(floor(n_files / 4), floor(n_files / 2), n_files)
 W <- max(W_considered)
@@ -368,7 +368,8 @@ for (ii in seq(1, number_chains)) {
       cms[[v]][[curr_cm_index]] <- .cm
 
       if (v != lopit_ind) {
-        predicted_partitions[[v]][[curr_cm_index]] <- mcclust::maxpear(.cm)$cl
+        predicted_partitions[[v]][[curr_cm_index]] <- matrix(allocations[[jj]][chains_used, , v], ncol = N)
+        # predicted_partitions[[v]][[curr_cm_index]] <- mcclust::maxpear(.cm)$cl
       } else {
         .alloc_prob <- ccCalcAllocProbs(allocation_probs[[jj]], view = lopit_ind)
         classification_probability[[curr_cm_index]] <- apply(.alloc_prob, 1, max)
@@ -485,12 +486,21 @@ if (plotting) {
     scale_fill_gradient(low = "#FFFFFF", high = "#146EB4") +
     labs(title = "Cell cycle CMs")
 
-  p_rna_psm <- rna_seq_cm_df %>%
-    ggplot(aes(x = x, y = y, fill = Entry)) +
-    geom_tile() +
-    facet_grid(Depth ~ Width, labeller = label_both) +
-    scale_fill_gradient(low = "#FFFFFF", high = "#146EB4") +
-    labs(title = "RNA-seq CMs")
+  if(V == 3) {
+    p_rna_psm <- rna_seq_cm_df %>%
+      ggplot(aes(x = x, y = y, fill = Entry)) +
+      geom_tile() +
+      facet_grid(Depth ~ Width, labeller = label_both) +
+      scale_fill_gradient(low = "#FFFFFF", high = "#146EB4") +
+      labs(title = "RNA-seq CMs")
+
+    ggsave(paste0(plot_dir, "rna_cms.png"),
+      plot = p_rna_psm,
+      height = plot_height,
+      width = plot_width
+    )
+
+  }
 
   p_lopit_psm <- lopit_cm_df %>%
     ggplot(aes(x = x, y = y, fill = Entry)) +
@@ -501,12 +511,6 @@ if (plotting) {
 
   ggsave(paste0(plot_dir, "cell_cycle_cms.png"),
     plot = p_cc_psm,
-    height = plot_height,
-    width = plot_width
-  )
-
-  ggsave(paste0(plot_dir, "rna_cms.png"),
-    plot = p_rna_psm,
     height = plot_height,
     width = plot_width
   )
@@ -587,6 +591,9 @@ for (v in view_inds) {
   output$cms[[v]] <- cms[[v]][[n_models]]
   output$allocations[[v]] <- allocations[[number_depths]][chains_used, , v]
 }
+output$fit <- fit_df
+output$mass <- mass_df
+output$phis <- phi_df
 
 saveRDS(output, file = output_file)
 
