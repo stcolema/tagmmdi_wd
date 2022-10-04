@@ -174,6 +174,7 @@ pattern <- paste0("(TGondiiMDI).*\\_K_", K, "_R_", R, "_V_", V, ".rds$")
 # pattern <- paste0("(TGondii_RNAseq).*\\_K_", K, "_R_", R, "_type_G.rds$")
 
 output_file <- paste0(save_dir, "CC_R_", R, "_K_", K, "_V_", V, ".rds")
+biggert_output_file <- paste0(save_dir, "CC_R_", R, "_K_", K, "_V_", V, "_all_other_objects.rds")
 
 cat("\n=== Reading in files ===================================================")
 
@@ -380,12 +381,16 @@ for (ii in seq(1, number_chains)) {
         comparison_d <- D_considered[jj - 1]
         comparison_cm_index <- which((models$Depth == comparison_d) & (models$Width == curr_w))
 
+        # ARI between predictions
+        ari <- mcclust::arandi(predicted_partitions[[v]][[curr_cm_index]], predicted_partitions[[v]][[comparison_cm_index]])
+        
         # mean_absolute_difference[[v]] <-
         mad <- mean(abs(cms[[v]][[curr_cm_index]] - cms[[v]][[comparison_cm_index]]))
         mad_entry <- data.frame(
           "Depth" = curr_d,
           "Width" = curr_w,
           "Mean_absolute_difference" = mad,
+          "Adjusted_Rand_index" = ari,
           "Depth_compared" = comparison_d,
           "Width_compared" = curr_w,
           "View" = v,
@@ -413,6 +418,9 @@ for (jj in seq(1, number_depths)) {
     comparison_w <- W_considered[ii - 1]
     comparison_cm_index <- which((models$Depth == curr_d) & (models$Width == comparison_w))
     for (v in view_inds) {
+      
+      # ARI between predictions
+      ari <- mcclust::arandi(predicted_partitions[[v]][[curr_cm_index]], predicted_partitions[[v]][[comparison_cm_index]])
 
       # mean_absolute_difference[[v]] <-
       mad <- mean(abs(cms[[v]][[curr_cm_index]] - cms[[v]][[comparison_cm_index]]))
@@ -420,6 +428,7 @@ for (jj in seq(1, number_depths)) {
         "Depth" = curr_d,
         "Width" = curr_w,
         "Mean_absolute_difference" = mad,
+        "Adjusted_Rand_index" = ari,
         "Depth_compared" = curr_d,
         "Width_compared" = comparison_w,
         "View" = v,
@@ -440,6 +449,11 @@ if (V == 3) {
   rna_seq_cm_df <- prepCMssForGGplot(cms[[3]], models, matrix_setting_order = n_models)
 }
 lopit_cm_df <- prepCMssForGGplot(cms[[1]], models, matrix_setting_order = n_models)
+
+lopit_cm_df$View <- "LOPIT"
+cell_cycle_cm_df$View <- "Cell-cycle"
+
+cm_df <- rbind(lopit_cm_df, cell_cycle_cm_df)
 
 cat("\nCMs prepared.")
 
@@ -594,8 +608,21 @@ for (v in view_inds) {
 output$fit <- fit_df
 output$mass <- mass_df
 output$phis <- phi_df
+output$stability <- mean_absolute_difference_df
 
 saveRDS(output, file = output_file)
+
+all_objects <- list(
+  "cms" = cms,
+  "cm_df" = cm_df,
+  "allocations" = allocations,
+  "predicted_partitions" = predicted_partitions,
+  "phi_df" = phi_df,
+  "mean_absolute_difference_df" = mean_absolute_difference_df,
+  "fit_df" = fit_df
+)
+
+saveRDS(all_objects, file = biggert_output_file)
 
 cat("\n# === SCRIPT COMPLETED ================================================")
 t1 <- Sys.time()
