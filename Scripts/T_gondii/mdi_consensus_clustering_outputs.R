@@ -142,7 +142,7 @@ args <- input_arguments()
 
 # Directories for input and output respectively
 inputdata_dir <- "./T_gondii/Prepared_data/" #
-save_dir <- "./T_gondii/ConsensusClustering/" #
+save_dir <- "./T_gondii/Analysis/" #
 model_output_dir <- "./T_gondii/ConsensusClustering/" #
 
 mdi_file <- "./T_gondii/ConsensusClustering/CCD15000W150/CC_R_15000_K_125_V_2.rds"
@@ -198,12 +198,11 @@ lopit_data <- read.csv(lopit_file,
 data_modelled <- readRDS(paste0(inputdata_dir, "TGondiiMDI_K_125_input.rds"))
 datasets <- c("LOPIT", "Cell_cycle", "RNA-seq")
 
-
-
 # === READ IN MODEL OUTPUT =====================================================
 
-model_output <- readRDS("./T_gondii/Output/processedModelOutputs.rds")
-
+pred_cl <- mdi_mod$predicted_partitions
+prob_cl <- mdi_mod$classification_probability
+fused_genes_1 <- which(colMeans(mdi_mod$allocations[[1]] == mdi_mod$allocations[[2]]) > 0.5)
 
 amplitude_inds <- seq(1, mix_mod$K)
 length_scale_inds <- seq(mix_mod$K + 1, 2 * mix_mod$K)
@@ -241,10 +240,6 @@ model_output$MDI$hypers[[2]]$noise |>
 model_output$MDI$hypers[[2]]$amplitude |>
   log() |>
   boxplot()
-
-pred_cl <- mdi_mod$predicted_partitions
-prob_cl <- mdi_mod$classification_probability
-fused_genes_1 <- which(colMeans(mdi_mod$allocations[[1]] == mdi_mod$allocations[[2]]) > 0.5)
 
 # === VIsualise results =======================================================
 
@@ -780,7 +775,12 @@ fixed_inds <- lopit_data$Fixed
 names(fixed_inds) <- row.names(lopit_data)
 
 fused_predictions$Fixed <- fixed_inds[fused_genes_1]
+
+unfused_predictions <- pred_df[-fused_genes_1, ]
+unfused_predictions$Fixed <- fixed_inds[-fused_genes_1]
+
 # write.csv(fused_predictions[order(fused_predictions$Cell.cycle), ], file = "./T_gondii/Analysis/tGondiiFusedClusters.csv")
+# write.csv(unfused_predictions[order(unfused_predictions$Cell.cycle), ], file = "./T_gondii/Analysis/tGondiiUnfusedClusters.csv")
 
 # === Investigate cell cycle splitting/merging ======================================
 
@@ -852,3 +852,23 @@ annotatedHeatmap(microarray_data[cl_mix_in_14, ], model_output$Cell_cycle$pred[[
   main = "Cell-cycle data annotated by predicted cluster" # ,
   # filename = "./rnaseq_predicted_clustering.png"
 )
+
+
+# === Individual clusters in cell-cycle data ====================================================
+
+for(ii in seq(1, length(unique(pred_cl[[2]])))) {
+  .cl <- which(pred_cl[[2]] == ii)
+  .x <- microarray_data[.cl, ]
+  
+  .main <- paste0("Cell-cycle data: cluster ", ii)
+  .save_name <- paste0(save_dir, "CellCycleCluster", ii, ".png")
+  pheatmap(.x, 
+           color = dataColPal(), 
+           breaks = defineDataBreaks(.x, dataColPal()), 
+           cluster_cols = FALSE, 
+           show_rownames = FALSE,
+           main = .main, 
+           filename = .save_name
+        )
+}
+ 
