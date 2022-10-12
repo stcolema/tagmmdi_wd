@@ -204,25 +204,25 @@ model_output <- readRDS("./T_gondii/Output/processedModelOutputs.rds")
 
 
 # Odd behaviour in hypers is probably due to empy components sampling the prior
-model_output$Cell_cycle$hypers[[1]]$length |> 
-  log() |> 
-  boxplot() 
-model_output$Cell_cycle$hypers[[1]]$noise |> 
-  log() |> 
-  boxplot() 
-model_output$Cell_cycle$hypers[[1]]$amplitude |> 
-  log() |> 
-  boxplot() 
+model_output$Cell_cycle$hypers[[1]]$length |>
+  log() |>
+  boxplot()
+model_output$Cell_cycle$hypers[[1]]$noise |>
+  log() |>
+  boxplot()
+model_output$Cell_cycle$hypers[[1]]$amplitude |>
+  log() |>
+  boxplot()
 
-model_output$MDI$hypers[[2]]$length |> 
-  log() |> 
-  boxplot() 
-model_output$MDI$hypers[[2]]$noise |> 
-  log() |> 
-  boxplot() 
-model_output$MDI$hypers[[2]]$amplitude |> 
-  log() |> 
-  boxplot() 
+model_output$MDI$hypers[[2]]$length |>
+  log() |>
+  boxplot()
+model_output$MDI$hypers[[2]]$noise |>
+  log() |>
+  boxplot()
+model_output$MDI$hypers[[2]]$amplitude |>
+  log() |>
+  boxplot()
 
 pred_cl <- model_output$MDI$pred
 prob_cl <- model_output$MDI$prob
@@ -293,33 +293,55 @@ misbehaving_organelles <- c(
   "tubulin cytoskeleton"
 )
 
+plotting <- TRUE
+n_rows <- 10
 lopit_plot_data |>
   ggplot(aes(x = Fraction, y = Measurement, group = Protein)) +
   geom_line(alpha = 0.3) +
-  ggforce::facet_grid_paginate(Organelle ~ Model, ncol = 2, nrow = 5, page = 1)
+  ggforce::facet_grid_paginate(Organelle ~ Model, ncol = 2, nrow = n_rows, page = 1)
 
+if (plotting) {
+  ggsave(paste0("./T_gondii/Analysis/MDI_TAGM_comp_first_", n_rows, "_organelles.png"),
+    height = 12,
+    width = 8
+  )
+}
 
 lopit_plot_data |>
   ggplot(aes(x = Fraction, y = Measurement, group = Protein)) +
   geom_line(alpha = 0.3) +
-  ggforce::facet_grid_paginate(Organelle ~ Model, ncol = 2, nrow = 5, page = 2)
+  ggforce::facet_grid_paginate(Organelle ~ Model, ncol = 2, nrow = n_rows, page = 2)
+
+if (plotting) {
+  ggsave(paste0("./T_gondii/Analysis/MDI_TAGM_comp_second_", n_rows, "_organelles.png"),
+    height = 12,
+    width = 8
+  )
+}
 
 # MDI puts a lot into GOLGI
 lopit_plot_data |>
   ggplot(aes(x = Fraction, y = Measurement, group = Protein)) +
   geom_line(alpha = 0.3) +
-  ggforce::facet_grid_paginate(Organelle ~ Model, ncol = 2, nrow = 5, page = 3)
+  ggforce::facet_grid_paginate(Organelle ~ Model, ncol = 2, nrow = n_rows, page = 3)
+
+if (plotting) {
+  ggsave(paste0("./T_gondii/Analysis/MDI_TAGM_comp_third_", n_rows, "_organelles.png"),
+    height = 12,
+    width = 8
+  )
+}
 
 # TAGM puts a lot more into the nulceus related organelles
 lopit_plot_data |>
   ggplot(aes(x = Fraction, y = Measurement, group = Protein)) +
   geom_line(alpha = 0.3) +
-  ggforce::facet_grid_paginate(Organelle ~ Model, ncol = 2, nrow = 5, page = 4)
+  ggforce::facet_grid_paginate(Organelle ~ Model, ncol = 2, nrow = n_rows, page = 4)
 
 lopit_plot_data |>
   ggplot(aes(x = Fraction, y = Measurement, group = Protein)) +
   geom_line(alpha = 0.3) +
-  ggforce::facet_grid_paginate(Organelle ~ Model, ncol = 2, nrow = 5, page = 5)
+  ggforce::facet_grid_paginate(Organelle ~ Model, ncol = 2, nrow = n_rows, page = 5)
 
 lopit_plot_data |>
   ggplot(aes(x = Fraction, y = Measurement, group = Protein)) +
@@ -356,7 +378,18 @@ p_tagm_mdi_contrast <- lopit_data |>
   facet_wrap(~Organelle) +
   ggthemes::scale_color_colorblind()
 
-ggsave("./tagm_mdi_contrast.png", p_tagm_mdi_contrast)
+ggsave("./T_gondii/Analysis/tagm_mdi_contrast.png", p_tagm_mdi_contrast, height = 12, width = 10)
+
+p_mdi_tagm_contrast <- lopit_data |>
+  pivot_longer(-c(Label, Fixed, Protein, MDI_prediction, TAGM_prediction), values_to = "Measurement", names_to = "Fraction") |>
+  mutate(Fraction = factor(Fraction)) |>
+  pivot_longer(c(MDI_prediction, TAGM_prediction), names_to = "Model", values_to = "Organelle") |>
+  ggplot(aes(x = Fraction, y = Measurement, group = Protein, colour = Model)) +
+  geom_line(alpha = 0.3) +
+  facet_wrap(~Organelle) +
+  ggthemes::scale_color_colorblind()
+
+ggsave("./T_gondii/Analysis/mdi_tagm_contrast.png", p_mdi_tagm_contrast, height = 12, width = 10)
 
 microarray_data |>
   mutate(
@@ -371,12 +404,15 @@ microarray_data |>
   # ggthemes::scale_color_colorblind() +
   facet_wrap(~Predicted_label)
 
-annotatedHeatmap(microarray_data, pred_cl[[1]],
+ggsave("./T_gondii/Analysis/mdi_cell_cycle_cluster_profiles.png", height = 12, width = 10)
+
+
+annotatedHeatmap(microarray_data, pred_cl[[2]],
   cluster_cols = FALSE,
   show_colnames = FALSE,
   show_rownames = FALSE,
-  main = "Cell-cycle data annotated by predicted cluster" # ,
-  # filename = "./rnaseq_predicted_clustering.png"
+  main = "Cell-cycle data annotated by predicted cluster",
+  filename = "./T_gondii/Analysis/cell_cycle_predicted_clustering.png"
 )
 
 
@@ -384,8 +420,8 @@ annotatedHeatmap(microarray_data[fused_genes_1, ], pred_cl[[2]][fused_genes_1],
   show_colnames = TRUE,
   show_rownames = FALSE,
   cluster_cols = FALSE,
-  main = "Fused genes in cell-cycle data annotated by predicted cluster" # ,
-  # filename = "./rnaseq_predicted_clustering.png"
+  main = "Fused genes in cell-cycle data annotated by predicted cluster",
+  filename = "./T_gondii/Analysis/cell_cycle_fused_genes_predicted_clustering.png"
 )
 
 
@@ -422,32 +458,32 @@ pheatmap::pheatmap(microarray_data[fused_genes_1, ],
 )
 
 fused_microarray_data <- microarray_data[fused_genes_1, ]
-fused_lopit_data <-data_modelled$data_modelled[[1]][fused_genes_1, ] 
+fused_lopit_data <- data_modelled$data_modelled[[1]][fused_genes_1, ]
 row_order <- order(mdi_predictions[fused_genes_1])
 
 ph_lopit <- pheatmap(fused_lopit_data[row_order, ],
-                   color = dataColPal(),
-                   breaks = defineDataBreaks(fused_lopit_data, dataColPal()),
-                   annotation_row = annotation_row[row_order, ],
-                   annotation_colors = annotation_colors,
-                   show_rownames = FALSE,
-                   cluster_cols = FALSE,
-                   cluster_rows = FALSE
-                   # main = "Fused  genes in cell-cycle data\nannotated by predicted cluster and localisation"
-                   # filename = "~/Desktop/mdiCellCycleFusedGenes.png"
+  color = dataColPal(),
+  breaks = defineDataBreaks(fused_lopit_data, dataColPal()),
+  annotation_row = annotation_row[row_order, ],
+  annotation_colors = annotation_colors,
+  show_rownames = FALSE,
+  cluster_cols = FALSE,
+  cluster_rows = FALSE
+  # main = "Fused  genes in cell-cycle data\nannotated by predicted cluster and localisation"
+  # filename = "~/Desktop/mdiCellCycleFusedGenes.png"
 )
 
 
 ph_cell_cycle <- pheatmap(fused_microarray_data[row_order, ],
-                     color = dataColPal(),
-                     breaks = defineDataBreaks(fused_lopit_data, dataColPal()),
-                     annotation_row = annotation_row[row_order, ],
-                     annotation_colors = annotation_colors,
-                     show_rownames = FALSE,
-                     cluster_cols = FALSE,
-                     cluster_rows = FALSE
-                     # main = "Fused  genes in cell-cycle data\nannotated by predicted cluster and localisation"
-                     # filename = "~/Desktop/mdiCellCycleFusedGenes.png"
+  color = dataColPal(),
+  breaks = defineDataBreaks(fused_lopit_data, dataColPal()),
+  annotation_row = annotation_row[row_order, ],
+  annotation_colors = annotation_colors,
+  show_rownames = FALSE,
+  cluster_cols = FALSE,
+  cluster_rows = FALSE
+  # main = "Fused  genes in cell-cycle data\nannotated by predicted cluster and localisation"
+  # filename = "~/Desktop/mdiCellCycleFusedGenes.png"
 )
 
 combinePheatmaps(list(ph_lopit$gtable, ph_cell_cycle$gtable), save_name = "~/Desktop/CombinedData.png", main = NULL)
@@ -669,27 +705,44 @@ pred_cl[[2]][fused_genes_1]
 pred_df <- data.frame("LOPIT" = mdi_predictions, "Cell-cycle" = c(pred_cl[[2]]))
 row.names(pred_df) <- row.names(data_modelled$data_modelled[[1]])
 
-pred_df[fused_genes_1, ] |> table()
+pred_df[fused_genes_1, ] |> table() # |> write.csv("~/Desktop/LOPIT_CellCycle_label_map.csv")
 
 dense_granule_cell_cycle <- which((pred_cl[[2]] == 3) & (model_output$MDI$fusion_probabilities[[1]] > 0.5))
-data_modelled$data_modelled[[2]][dense_granule_cell_cycle, ] |> 
-  pheatmap(cluster_cols = FALSE, show_colnames = FALSE)
+data_modelled$data_modelled[[2]][dense_granule_cell_cycle, ] |>
+  pheatmap(
+    cluster_cols = FALSE,
+    show_colnames = FALSE,
+    main = "Dense granule localised proteins cell-cycle data",
+    filename = "./T_gondii/Analysis/cell_cycle_dense_granules.png"
+  )
+
+
+rhoptries_1_cell_cycle <- which((pred_cl[[2]] == 11) & (model_output$MDI$fusion_probabilities[[1]] > 0.5))
+data_modelled$data_modelled[[2]][rhoptries_1_cell_cycle, ] |>
+  pheatmap(
+    cluster_cols = FALSE,
+    show_colnames = FALSE,
+    main = "Rhoptries 1 localised proteins cell-cycle data",
+    filename = "./T_gondii/Analysis/cell_cycle_rhoptries_1.png"
+  )
 
 row.names(data_modelled$data_modelled[[1]])[dense_granule_cell_cycle]
 
 fused_predictions <- pred_df[fused_genes_1, ]
 
-write.csv(fused_predictions[order(fused_predictions$Cell.cycle), ], file = "~/Desktop/tGondiiClusters.csv")
+write.csv(fused_predictions[order(fused_predictions$Cell.cycle), ], file = "./T_gondii/Analysis/tGondiiFusedClusters.csv")
 
 # === Investigate cell cycle splitting/merging ======================================
 
 
-p_occ_mdi <- (1 * (model_output$MDI$N_k[[2]] != 0)) |> 
+p_occ_mdi <- (1 * (model_output$MDI$N_k[[2]] != 0)) |>
   pheatmap(cluster_cols = TRUE, cluster_rows = FALSE, main = "MDI", silent = TRUE, color = simColPal())
 
-p_occ_mix <- (1 * (model_output$Cell_cycle$N_k[[1]] != 0)) |> 
-  pheatmap(cluster_cols = TRUE, cluster_rows = FALSE, main = "Mixture model", silent = TRUE,
-           color = simColPal())
+p_occ_mix <- (1 * (model_output$Cell_cycle$N_k[[1]] != 0)) |>
+  pheatmap(
+    cluster_cols = TRUE, cluster_rows = FALSE, main = "Mixture model", silent = TRUE,
+    color = simColPal()
+  )
 
 rowSums((1 * (model_output$MDI$N_k[[2]] != 0))) |> mean()
 rowSums((1 * (model_output$Cell_cycle$N_k[[1]] != 0))) |> mean()
@@ -701,25 +754,28 @@ model_output$MDI$pred[[2]] |> table()
 
 cl_14 <- which(pred_cl[[2]] == 14)
 
-model_output$Cell_cycle$pred[[1]][cl_14]
-model_output$MDI$pred[[2]][cl_14]
+pred_cl[[1]][cl_14]
+pred_cl[[2]][cl_14]
 
-data_modelled$data_modelled[[2]] |> 
+data_modelled$data_modelled[[2]] |>
   annotatedHeatmap()
 
-cl_14_order <- order(model_output$Cell_cycle$pred[[1]][cl_14])
+cl_14_order <- order(pred_cl[[1]][cl_14])
 
 cl_mix_in_14 <- model_output$Cell_cycle$pred[[1]] %in% c(4, 5, 7, 24, 32, 37, 57, 76, 94, 96, 102, 105, 109)
 
 pred_cell_cycle <- data.frame("MDI" = c(model_output$MDI$pred[[2]]), "Mixture.model" = c(model_output$Cell_cycle$pred[[1]]))
 
-pred_cell_cycle |> 
-  table() |> 
-  apply(1, function(x) {x / sum(x)}) |> 
-  pheatmap(cluster_rows = TRUE, 
-    cluster_cols = FALSE, 
+pred_cell_cycle |>
+  table() |>
+  apply(1, function(x) {
+    x / sum(x)
+  }) |>
+  pheatmap(
+    cluster_rows = TRUE,
+    cluster_cols = FALSE,
     main = "Fraction of mixture model clusters in MDI clusters",
-    color = simColPal() #,
+    color = simColPal() # ,
     # filename = "~/Desktop/cellCycleMDIMixtureOverlap.png"
   )
 
@@ -727,22 +783,22 @@ annotatedHeatmap(microarray_data[cl_14[cl_14_order], ], model_output$Cell_cycle$
   cluster_cols = FALSE,
   show_colnames = FALSE,
   show_rownames = FALSE,
-  main = "Cell-cycle data\nCluster 14 from MDI annotated by predicted cluster in mixture model" #,
+  main = "Cell-cycle data\nCluster 14 from MDI annotated by predicted cluster in mixture model" # ,
   # filename = "~/Desktop/cellCycleMDIclust14AnnotatedMixLabels.png"
 )
 
 annotatedHeatmap(microarray_data[cl_mix_in_14, ], model_output$MDI$pred[[2]][cl_mix_in_14],
-                 cluster_cols = FALSE,
-                 show_colnames = FALSE,
-                 show_rownames = FALSE,
-                 main = "Cell-cycle data annotated by predicted cluster" # ,
-                 # filename = "./rnaseq_predicted_clustering.png"
+  cluster_cols = FALSE,
+  show_colnames = FALSE,
+  show_rownames = FALSE,
+  main = "Cell-cycle data annotated by predicted cluster" # ,
+  # filename = "./rnaseq_predicted_clustering.png"
 )
 
 annotatedHeatmap(microarray_data[cl_mix_in_14, ], model_output$Cell_cycle$pred[[1]][cl_mix_in_14],
-                 cluster_cols = FALSE,
-                 show_colnames = FALSE,
-                 show_rownames = FALSE,
-                 main = "Cell-cycle data annotated by predicted cluster" # ,
-                 # filename = "./rnaseq_predicted_clustering.png"
+  cluster_cols = FALSE,
+  show_colnames = FALSE,
+  show_rownames = FALSE,
+  main = "Cell-cycle data annotated by predicted cluster" # ,
+  # filename = "./rnaseq_predicted_clustering.png"
 )

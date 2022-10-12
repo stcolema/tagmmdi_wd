@@ -192,6 +192,38 @@ mdi_mod$hypers[[2]]$amplitude[, filled_inds] |>
 
 # === Visualise results =======================================================
 
+
+marker_labels <- label_to_organelle$Organelle[data_modelled$initial_labels[, 1]]
+marker_labels[data_modelled$fixed[, 1] == 0] <- NA
+
+anno_row <- data.frame(Localisation = factor(marker_labels, levels = sort(unique(marker_labels))))
+row.names(anno_row) <- row.names(data_modelled$data_modelled[[1]])
+
+ann_colours <- list(Localisation = viridis::viridis(26))
+names(ann_colours$Localisation) <- sort(unique(label_to_organelle$Organelle))
+
+pheatmap::pheatmap(data_modelled$data_modelled[[1]],
+  color = dataColPal(),
+  breaks = defineDataBreaks(data_modelled$data_modelled[[1]], dataColPal(), mid_point = 0),
+  annotation_row = anno_row,
+  annotation_colors = ann_colours,
+  show_rownames = FALSE,
+  cluster_cols = FALSE,
+  filename = "./T_gondii/Original_data/LOPIT_heatmap.png"
+)
+
+colnames(data_modelled$data_modelled[[2]]) <- paste0(seq(0, 12), " HR")
+pheatmap::pheatmap(data_modelled$data_modelled[[2]],
+  color = dataColPal(),
+  breaks = defineDataBreaks(data_modelled$data_modelled[[2]], dataColPal(), mid_point = 0),
+  # annotation_row = anno_row,
+  # annotation_colors = ann_colours,
+  show_rownames = FALSE,
+  cluster_cols = FALSE,
+  filename = "./T_gondii/Original_data/CellCycle_heatmap.png"
+)
+
+
 # === LOPIT ===================================================================
 
 # Compare MDI and TAGM allocations

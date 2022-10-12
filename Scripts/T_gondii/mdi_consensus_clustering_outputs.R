@@ -18,70 +18,6 @@ suppressMessages(library(tibble))
 suppressMessages(library(pheatmap))
 suppressMessages(library(patchwork))
 
-
-prepCMssForGGplot <- function(cms, model_description_df,
-                              matrix_setting_order = 1,
-                              use_common_ordering = TRUE) {
-  not_list <- !is.list(cms)
-  if (not_list) {
-    stop("`similarity_matrices` must be a list of matrices.")
-  }
-
-  n_matrices <- length(cms)
-  n_models <- nrow(model_description_df)
-  if (n_matrices != n_models) {
-    .err <- paste(
-      "Number of consensus matrices and number of models described",
-      "in ``model_description_df`` are not matching."
-    )
-    stop(.err)
-  }
-  row_order <- col_order <- findOrder(cms[[matrix_setting_order]])
-
-  depths <- model_description_df$Depth
-  widths <- model_description_df$Width
-
-  for (ii in seq(1, n_matrices)) {
-    first_iteration <- ii == 1
-
-    d <- depths[ii]
-    w <- widths[ii]
-    .df <- prepDataForggHeatmap(cms[[ii]], row_order, col_order)
-    .df$Depth <- d
-    .df$Width <- w
-
-    if (first_iteration) {
-      cm_df <- .df
-    } else {
-      cm_df <- rbind(cm_df, .df)
-    }
-  }
-  cm_df$Depth <- factor(cm_df$Depth)
-  cm_df$Width <- factor(cm_df$Width)
-  cm_df
-}
-
-ccCalcAllocProbs <- function(allocation_probabilities, view,
-                             burn = 0,
-                             method = "median") {
-  .alloc <- allocation_probabilities[[view]] # mcmc_samples$allocation_probabilities[[view]]
-
-  probs <- NULL
-
-  if (method == "median") {
-    probs <- apply(.alloc, c(1, 2), median)
-  }
-  if (method == "mean") {
-    probs <- rowSums(.alloc, dims = 2) / dim(.alloc)[3]
-  }
-  if (length(probs) == 1) {
-    if (is.null(probs)) {
-      stop("``method`` must be one of 'mean' or 'median'")
-    }
-  }
-  probs
-}
-
 # User inputs from command line
 input_arguments <- function() {
   option_list <- list(
@@ -145,7 +81,8 @@ inputdata_dir <- "./T_gondii/Prepared_data/" #
 save_dir <- "./T_gondii/Analysis/" #
 model_output_dir <- "./T_gondii/ConsensusClustering/" #
 
-mdi_file <- "./T_gondii/ConsensusClustering/CCD15000W150/CC_R_15000_K_125_V_2.rds"
+# mdi_file <- "./T_gondii/ConsensusClustering/CCD15000W150/CC_R_15000_K_125_V_2.rds"
+mdi_file <- "./T_gondii/ConsensusClustering/CC_R_15000_K_125_full.rds"
 mix_file <- "./T_gondii/ConsensusClustering/CC_R_15000_K_300_cell_cycle_mix.rds"
 
 D <- 15000
@@ -200,44 +137,62 @@ datasets <- c("LOPIT", "Cell_cycle", "RNA-seq")
 
 # === READ IN MODEL OUTPUT =====================================================
 
-pred_cl <- mdi_mod$predicted_partitions
-prob_cl <- mdi_mod$classification_probability
+pred_cl <- mdi_mod$pred
+prob_cl <- mdi_mod$prob
+
+# pred_cl <- mdi_mod$predicted_partitions
+# prob_cl <- mdi_mod$classification_probability
 fused_genes_1 <- which(colMeans(mdi_mod$allocations[[1]] == mdi_mod$allocations[[2]]) > 0.5)
 
 amplitude_inds <- seq(1, mix_mod$K)
 length_scale_inds <- seq(mix_mod$K + 1, 2 * mix_mod$K)
 noise_inds <- seq(2 * mix_mod$K + 1, 3 * mix_mod$K)
 
-amp_acc_df <- data.frame("Parameter" = "Amplitude", "Acceptance_rate" = c(mix_mod$acceptance_count[[1]][, amplitude_inds]))
-length_acc_df <- data.frame("Parameter" = "Length-scale", "Acceptance_rate" = c(mix_mod$acceptance_count[[1]][, length_scale_inds]))
-noise_acc_df <- data.frame("Parameter" = "Noise", "Acceptance_rate" = c(mix_mod$acceptance_count[[1]][, noise_inds]))
+mix_amp_acc_df <- data.frame("Parameter" = "Amplitude", "Acceptance_rate" = c(mix_mod$acceptance_count[[1]][, amplitude_inds]))
+mix_length_acc_df <- data.frame("Parameter" = "Length-scale", "Acceptance_rate" = c(mix_mod$acceptance_count[[1]][, length_scale_inds]))
+mix_noise_acc_df <- data.frame("Parameter" = "Noise", "Acceptance_rate" = c(mix_mod$acceptance_count[[1]][, noise_inds]))
 
-acc_df <- rbind(amp_acc_df, length_acc_df, noise_acc_df)
-acc_df |>
+amplitude_inds <- seq(1, mdi_mod$K[2])
+length_scale_inds <- seq(mdi_mod$K[2] + 1, 2 * mdi_mod$K[2])
+noise_inds <- seq(2 * mdi_mod$K[2] + 1, 3 * mdi_mod$K[2])
+
+mdi_amp_acc_df <- data.frame("Parameter" = "Amplitude", "Acceptance_rate" = c(mdi_mod$acceptance_count[[2]][, amplitude_inds]))
+mdi_length_acc_df <- data.frame("Parameter" = "Length-scale", "Acceptance_rate" = c(mdi_mod$acceptance_count[[2]][, length_scale_inds]))
+mdi_noise_acc_df <- data.frame("Parameter" = "Noise", "Acceptance_rate" = c(mdi_mod$acceptance_count[[2]][, noise_inds]))
+
+
+mix_acc_df <- rbind(mix_amp_acc_df, mix_length_acc_df, mix_noise_acc_df)
+mdi_acc_df <- rbind(mdi_amp_acc_df, mdi_length_acc_df, mdi_noise_acc_df)
+
+mdi_acc_df |>
   ggplot(aes(x = Parameter, y = Acceptance_rate)) +
   geom_boxplot(fill = "gold") +
   labs(y = "Acceptance rate across chains")
 
+mix_acc_df |>
+  ggplot(aes(x = Parameter, y = Acceptance_rate)) +
+  geom_boxplot(fill = "gold") +
+  labs(y = "Acceptance rate across chains")
 
-
-# Odd behaviour in hypers is probably due to empy components sampling the prior
 mix_mod$hypers[[1]]$length |>
   log() |>
   boxplot()
-model_output$Cell_cycle$hypers[[1]]$noise |>
+mix_mod$hypers[[1]]$noise |>
   log() |>
   boxplot()
-model_output$Cell_cycle$hypers[[1]]$amplitude |>
+mix_mod$hypers[[1]]$amplitude |>
   log() |>
   boxplot()
 
-model_output$MDI$hypers[[2]]$length |>
+filled_inds <- seq(7, 24)
+
+mdi_mod$hypers[[2]]$length[, filled_inds] |>
   log() |>
   boxplot()
-model_output$MDI$hypers[[2]]$noise |>
+mdi_mod$hypers[[2]]$noise[, filled_inds] |>
   log() |>
   boxplot()
-model_output$MDI$hypers[[2]]$amplitude |>
+mdi_mod$hypers[[2]]$amplitude[, filled_inds] |>
   log() |>
   boxplot()
 
@@ -254,7 +209,7 @@ label_to_organelle <- data.frame(
 )
 
 mdi_predictions <- label_to_organelle$Organelle[pred_cl[[1]]]
-mdi_probabilities <- prob_cl
+mdi_probabilities <- prob_cl[[1]]
 
 tagm_comparison <- tagm_comparison[proteins_modelled, ]
 # proteins_modelled <- which(row.names(tagm_comparison) %in% row.names(lopit_data))
@@ -281,9 +236,9 @@ p_mdi <- lopit_data |>
   mutate(Fraction = factor(Fraction), Localisation_known = factor(Fixed, levels = c(1, 0), labels = c("True", "False"))) |>
   ggplot(aes(x = Fraction, y = Measurement, group = Protein, color = Localisation_known)) +
   geom_line(alpha = 0.3) +
-  facet_wrap(~MDI_prediction) +
+  facet_wrap(~MDI_prediction, ncol = 5) +
   ggthemes::scale_color_colorblind() +
-  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1, size = 8))
 
 p_tagm <- lopit_data |>
   pivot_longer(-c(Label, Fixed, Protein, MDI_prediction, TAGM_prediction), values_to = "Measurement", names_to = "Fraction") |>
@@ -292,9 +247,71 @@ p_tagm <- lopit_data |>
   geom_line(alpha = 0.3) +
   facet_wrap(~TAGM_prediction) +
   ggthemes::scale_color_colorblind() +
-  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1, size = 8))
+
+# lopit_pcs <- lopit_data[, seq(1, 30)] |> 
+#   as.matrix() |> 
+#   prcomp()
+# 
+# pc_df <- lopit_pcs$x[, c(1, 2)] |> 
+#   as.data.frame()
+# 
+# colnames(pc_df) <- c("PC1", "PC2")
+# pc_df$Localisation <- mdi_predictions
+# pc_df$Probability <- mdi_probabilities
+# 
+# set.seed(1)
+# pc_df |> 
+#   ggplot(aes(x = PC1, y = PC2, color = Localisation, alpha = Probability)) +
+#   geom_point()
+
 
 p_mdi / p_tagm
+
+golgi_inds <- which(mdi_predictions == "Golgi")
+pm_peripheral_2_inds <- which(mdi_predictions == "PM - peripheral 2")
+pheatmap(mdi_mod$cms[[1]][nuc_chromatin_inds, nuc_chromatin_inds], color = simColPal(), breaks =  defineBreaks(simColPal(), lb = 0),
+         show_rownames = FALSE, show_colnames = FALSE)
+organelle_of_interest_inds <- c(pm_peripheral_2_inds, golgi_inds)
+
+row.names(mdi_mod$cm[[1]]) <- row.names(mdi_mod$cm[[2]]) <- row.names(data_modelled$data_modelled[[1]])
+
+annotatedHeatmap(mdi_mod$cm[[1]][organelle_of_interest_inds, organelle_of_interest_inds],
+  mdi_predictions[organelle_of_interest_inds],
+  col_pal = simColPal(), 
+  my_breaks =  defineBreaks(simColPal(), lb = 0),
+  show_rownames = FALSE, 
+  show_colnames = FALSE,
+  main = NA
+)
+
+# Create the annotation data.frame for the rows
+anno_row <- data.frame(Localisation = factor(mdi_predictions[organelle_of_interest_inds])) 
+row.names(anno_row) <- rownames(mdi_mod$cm[[1]][organelle_of_interest_inds, ])
+
+ann_colors <- list(Localisation = ggthemes::colorblind_pal()(2))
+names(ann_colors$Localisation) <- unique(mdi_predictions[organelle_of_interest_inds])
+
+pheatmap::pheatmap(mdi_mod$cm[[1]][organelle_of_interest_inds, organelle_of_interest_inds],
+  color = simColPal(),
+  annotation_row = anno_row,
+  annotation_colors = ann_colors,
+  show_rownames = FALSE,
+  show_colnames = FALSE,
+  filename = paste0(save_dir, "MDI_Goldi_PM2_cm.png")
+)
+
+ggsave(paste0(save_dir, "MDI_LOPIT_localisations_fixed.png"), plot = p_mdi, height = 10, width = 18)
+
+lopit_data |>
+  mutate(MDI_prob = mdi_probabilities) |> 
+  pivot_longer(-c(Label, Fixed, Protein, MDI_prediction, TAGM_prediction, MDI_prob), values_to = "Measurement", names_to = "Fraction") |>
+  mutate(Fraction = factor(Fraction), Localisation_known = factor(Fixed, levels = c(1, 0), labels = c("True", "False"))) |>
+  ggplot(aes(x = Fraction, y = Measurement, group = Protein, color = Localisation_known)) +
+  geom_line(aes(alpha = MDI_prob)) +
+  facet_wrap(~MDI_prediction) +
+  ggthemes::scale_color_colorblind() +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
 
 lopit_plot_data <- lopit_data |>
   pivot_longer(-c(Label, Fixed, Protein, MDI_prediction, TAGM_prediction), values_to = "Measurement", names_to = "Fraction") |>
@@ -308,9 +325,38 @@ lopit_plot_data <- lopit_data |>
 # These organelles are a lot noisier in MDI vs TAGM
 misbehaving_organelles <- c(
   "Golgi",
-  "nucleolus",
-  "tubulin cytoskeleton"
+  "nucleolus"
 )
+
+lopit_plot_data |>
+  filter(Organelle %in% c("Golgi", "nucleolus")) |> 
+  mutate(Origin = case_when(
+    Model == "MDI" ~ "Semi-supervised MDI",
+    Model == "TAGM" ~ "Baryluk et al."
+  )) |> 
+  ggplot(aes(x = Fraction, y = Measurement, group = Protein, color = Localisation_known)) +
+  geom_line(alpha = 0.3) +
+  facet_grid(Organelle ~ Origin) +
+  ggthemes::scale_color_colorblind() +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
+
+ggsave(paste0(save_dir, "ComparisonTAGMNucelolusMDIGolgi.png"))
+
+mdi_golgi_inds <- lopit_data$MDI_prediction == "Golgi"
+tagm_nucleolus_inds <- lopit_data$TAGM_prediction == "nucleolus"
+lopit_data[which(mdi_golgi_inds | tagm_nucleolus_inds), ] |>
+  pivot_longer(-c(Label, Fixed, Protein, MDI_prediction, TAGM_prediction), values_to = "Measurement", names_to = "Fraction") |>
+  mutate(Fraction = factor(Fraction), Localisation_known = factor(Fixed, levels = c(1, 0), labels = c("True", "False"))) |>
+  pivot_longer(c(MDI_prediction, TAGM_prediction), names_to = "Model", values_to = "Organelle") |>
+  mutate(Model = case_when(
+    Model == "MDI_prediction" ~ "MDI",
+    Model == "TAGM_prediction" ~ "TAGM"
+  )) |> 
+  ggplot(aes(x = Fraction, y = Measurement, group = Protein, color = Localisation_known)) +
+  geom_line(alpha = 0.3) +
+  facet_grid(Organelle ~ Model) +
+  ggthemes::scale_color_colorblind() +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1, size = 8))
 
 p1 <- lopit_plot_data |>
   ggplot(aes(x = Fraction, y = Measurement, group = Protein, color = Localisation_known)) +
@@ -444,7 +490,7 @@ microarray_data |>
   # ggthemes::scale_color_colorblind() +
   facet_wrap(~Predicted_label)
 
-ggsave("./T_gondii/Analysis/mdi_cell_cycle_cluster_profiles.png", height = 12, width = 10)
+ggsave("./T_gondii/Analysis/mdi_cell_cycle_cluster_profiles.png", height = 12, width = 16)
 
 
 annotatedHeatmap(microarray_data, pred_cl[[2]],
@@ -747,6 +793,8 @@ row.names(pred_df) <- row.names(data_modelled$data_modelled[[1]])
 
 pred_df[fused_genes_1, ] |> table() # |> write.csv("~/Desktop/LOPIT_CellCycle_label_map.csv")
 
+
+dense_granule_cell_cycle <- which((pred_cl[[2]] == 5) & colMeans(mdi_mod$allocations[[1]] == mdi_mod$allocations[[2]]) > 0.5)
 dense_granule_cell_cycle <- which((pred_cl[[2]] == 3) & (model_output$MDI$fusion_probabilities[[1]] > 0.5))
 data_modelled$data_modelled[[2]][dense_granule_cell_cycle, ] |>
   pheatmap(
@@ -756,8 +804,8 @@ data_modelled$data_modelled[[2]][dense_granule_cell_cycle, ] |>
     filename = "./T_gondii/Analysis/cell_cycle_dense_granules.png"
   )
 
-
-rhoptries_1_cell_cycle <- which((pred_cl[[2]] == 11) & (model_output$MDI$fusion_probabilities[[1]] > 0.5))
+rhoptries_1_cell_cycle <- which((pred_cl[[2]] == 14) & colMeans(mdi_mod$allocations[[1]] == mdi_mod$allocations[[2]]) > 0.5)
+# rhoptries_1_cell_cycle <- which((pred_cl[[2]] == 11) & (model_output$MDI$fusion_probabilities[[1]] > 0.5))
 data_modelled$data_modelled[[2]][rhoptries_1_cell_cycle, ] |>
   pheatmap(
     cluster_cols = FALSE,
