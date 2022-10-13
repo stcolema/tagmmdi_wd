@@ -6,7 +6,7 @@ Paper specific scripts.
 Generate the data by calling:
 
 ```{bash generateSims}
-Rscript ./Scripts/generateSimulationDataV3.R --save_dir "./Simulations/DataPhiModel/" --plot_data TRUE;
+Rscript ./Scripts/generateSimulationData.R --save_dir "./Simulations/Data/" --plot_data TRUE;
 ```
 
 Analyse this data by calling
@@ -14,18 +14,25 @@ Analyse this data by calling
 ```{bash simStudy}
 scenarios=("Gaussian" "MVT" "LogPoisson")
 n_sims=100;
+R=15000;
+thin=100;
+burn=7500;
+n_chains=10;
 
 for scn in "${scenarios[@]}"
 do
   for(( ii=1; ii<=${n_sims}; ii++))
   do
     # The case with K known
-    Rscript ./Scripts/analyseSimulation.R --R 15000 --thin 100 --burn 7500 --index ${ii} --n_chains 10 --K 6 --n_clust_unsupervised 50 --scn ${scn} --save_dir ./Simulations/OutputPhiModel/ --data_dir ./Simulations/DataPhiModel/;
-    
-    # Using an overfitted mixture
-    Rscript ./Scripts/analyseSimulation.R --R 15000 --thin 100 --burn 7500 --index ${ii} --n_chains 10 --K 60 --n_clust_unsupervised 50 --scn ${scn} --save_dir ./Simulations/OutputPhiModel/ --data_dir ./Simulations/DataPhiModel/;
+    Rscript ./Scripts/analyseSimulation.R --R ${R} --thin ${thin} --burn ${burn} --index ${ii} --n_chains ${n_chains} --K 5 --n_clust_unsupervised 50 --scn ${scn} --save_dir ./Simulations/Output/ --data_dir ./Simulations/Data/;
   done
 done
+
+# Find the best chains from each simulation
+Rscript ./Scripts/Simulations/identify_best_chains.R --data_dir ./Simulations/Data/ --save_dir ./Simulations/Output/ --model_output_dir ./Simulations/Output/;
+
+# Make the ARI comparison plot
+Rscript ./Scripts/Simulations/plotOutputSimulations.R --model_output_dir ./Simulations/Output/;
 ```
 
 ## Integrating LOPIT and GO data
@@ -66,22 +73,24 @@ Then call MDI using
 
 ```{bash tGondiiCC}
 # The long chains
-n_chains=9;
+n_chains=5;
 for(( ii=1; ii<=${n_chains}; ii++))
 do
-  Rscript ./Scripts/callMDITGondiiModelOnly.R --data_file ./T_gondii/Data/TGondiiMDI_K_125_input.rds --R 45000 --thin 250 --seed ${ii} --K 125 --n_chains 1 --save_dir ./T_gondii/Output/;
+  Rscript ./Scripts/callMDITGondiiModelOnly.R --data_file ./T_gondii/Data/TGondiiMDI_K_125_input.rds --R 30000 --thin 250 --seed ${ii} --K 125 --n_chains 1 --save_dir ./T_gondii/Output/;
 done;
 
 # Consensus clustering
-n_chains=50;
+n_chains=150;
 for(( ii=1; ii<=${n_chains}; ii++))
 do
-  Rscript ./Scripts/callMDITGondiiModelOnly.R --data_file ./T_gondii/Data/TGondiiMDI_K_125_input.rds --R 12000 --thin 1000 --seed ${ii} --K 125 --n_chains 1 --save_dir ./T_gondii/ConsensusClustering/;
+  Rscript ./Scripts/callMDITGondiiModelOnly.R --data_file ./T_gondii/Data/TGondiiMDI_K_125_input.rds --R 15000 --thin 1000 --seed ${ii} --K 125 --n_chains 1 --save_dir ./T_gondii/ConsensusClustering/;
 done;
 ```
 
 Then to process the output of the consensus clustering
 
-```{r processCC}
-Rscript ./Scripts/processTGondiiCCoutput.R --data_dir ./T_gondii/Data/ --R 12000 --K 125 --save_dir ./T_gondii/ConsensusClustering/ --model_output_dir ./T_gondii/ConsensusClustering/
+```{bash processCC}
+Rscript ./Scripts/T_gondii/OutputProccessing/processTGondiiCCoutput.R --data_dir ./T_gondii/Data/ --R 15000 --thin 1000 --K 125 --save_dir ./T_gondii/ConsensusClustering/ --model_output_dir ./T_gondii/ConsensusClustering/ --V 2 --plotting true
 ```
+
+
