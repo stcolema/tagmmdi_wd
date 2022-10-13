@@ -1,11 +1,51 @@
 
 library(ggplot2)
 library(tagmReDraft)
+library(optparse)
+
+# User inputs from command line
+input_arguments <- function() {
+  option_list <- list(
+
+    # Convert all files in target destination (default is FALSE)
+    optparse::make_option(c("--data_dir"),
+      type = "character",
+      default = "./Simulations/Data/",
+      help = "Directory here the data that were modelled are stored.",
+      metavar = "character"
+    ),
+
+    # Convert all files in target destination (default is FALSE)
+    optparse::make_option(c("--save_dir"),
+      type = "character",
+      default = "./Simulations/Output/",
+      help = "Directory to save the outputs of this file to.",
+      metavar = "character"
+    ),
+
+    # Convert all files in target destination (default is FALSE)
+    optparse::make_option(c("--model_output_dir"),
+      type = "character",
+      default = "./Simulations/Output",
+      help = "Directory where the model outputs are saved.",
+      metavar = "character"
+    )
+  )
+
+  opt_parser <- optparse::OptionParser(option_list = option_list)
+  opt <- optparse::parse_args(opt_parser)
+}
+
 
 mdiHelpR::setMyTheme()
 
-data_dir <- "./Simulations/Data/"
-output_dir <- "./Simulations/Output/"
+args <- input_arguments()
+
+data_dir <- args$data_dir # "./Simulations/Data/"
+output_dir <- args$model_output_dir # "./Simulations/Output/"
+save_dir <- args$save_dir
+saved_item <- paste0(save_dir, "OutputChainsUsed.csv")
+
 scenarios <- list.dirs(data_dir, recursive = FALSE, full.names = FALSE)
 n_scn <- length(scenarios)
 V <- 3
@@ -80,11 +120,28 @@ for (ii in seq(1, n_scn)) {
             }
           }
         }
-        chain_setting_order_view_used <- lapply(chain_setting_order_ari, mean) |>
-          unlist() |>
-          which.max()
-        chain_setting_order_used <- chain_setting_order[chain_setting_order_view_used + 1]
 
+        if (mixture_model) {
+          entry <- data.frame(
+            Scenario = scn,
+            Model = models[kk],
+            Seed = jj,
+            Chain_used = chain_setting_order,
+            Views = seq(1, V)
+          )
+        } else {
+          chain_setting_order_view_used <- lapply(chain_setting_order_ari, mean) |>
+            unlist() |>
+            which.max()
+          chain_setting_order_used <- chain_setting_order[chain_setting_order_view_used + 1]
+          entry <- data.frame(
+            Scenario = scn,
+            Model = models[kk],
+            Seed = jj,
+            Chain_used = chain_setting_order_used,
+            Views = seq(1, V)
+          )
+        }
         if (plotting_psms) {
           if (mixture_model) {
             for (v in seq(1, V)) {
@@ -109,7 +166,6 @@ for (ii in seq(1, n_scn)) {
         # save_name <- paste0("~/Desktop/TAGMMDI_SIMS/", scn, "/", models[kk], "seed", jj, ".png")
         # ggsave(save_name, p_psm, height = 8, width = 12)
 
-        entry <- data.frame(Scenario = scn, Model = models[kk], Seed = jj, Chain_used = chain_setting_order_used)
         if (is.null(selection_df)) {
           selection_df <- entry
         } else {
@@ -120,4 +176,8 @@ for (ii in seq(1, n_scn)) {
   }
 }
 
-write.csv(selection_df, "./Simulations/Output/OutputChainsUsed.csv")
+cat("\nSaveing selection data frame to:\n", saved_item, sep = "")
+
+write.csv(selection_df, saved_item)
+
+cat("\nScript complete.")

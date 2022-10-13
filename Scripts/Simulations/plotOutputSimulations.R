@@ -1,14 +1,34 @@
 
-library(tagmReDraft)
-library(mdiHelpR)
-library(ggplot2)
-library(tidyr)
-library(patchwork)
+suppressMessages(library(tagmReDraft))
+suppressMessages(library(mdiHelpR))
+suppressMessages(library(ggplot2))
+suppressMessages(library(tidyr))
+suppressMessages(library(patchwork))
+suppressMessages(library(optparse))
 
-setMyTheme()
+# User inputs from command line
+input_arguments <- function() {
+  option_list <- list(
+    # Convert all files in target destination (default is FALSE)
+    optparse::make_option(c("--model_output_dir"),
+      type = "character",
+      default = "./Simulations/Output",
+      help = "Directory where the model outputs are saved.",
+      metavar = "character"
+    )
+  )
 
-out_dir <- "Simulations/Output/"
-selection_df <- read.csv("./Simulations/Output/OutputChainsUsed.csv")
+  opt_parser <- optparse::OptionParser(option_list = option_list)
+  opt <- optparse::parse_args(opt_parser)
+}
+
+
+mdiHelpR::setMyTheme()
+
+args <- input_arguments()
+
+out_dir <- args$model_output_dir
+selection_df <- read.csv(paste0(out_dir, "OutputChainsUsed.csv"))
 
 scenarios <- list.dirs(out_dir, full.names = F, recursive = F)
 scn_dirs <- paste0(out_dir, scenarios)
@@ -49,15 +69,28 @@ for (ii in seq(1, n_files)) {
     chain_used <- selection_df$Chain_used[rel_selection_df_ind]
 
     if (jj %in% c(1, 2, 3)) {
+      chain_used <- unique(chain_used)
       rel_phis <- .x$MCMC[[jj]][[chain_used]]$phis |>
         as.data.frame()
       rel_phis$Model <- mod
       rel_phis$Index <- dataset_index
       rel_phis$Scenario <- scn
+      rel_ari <- .ari |>
+        dplyr::filter(Model == mod, Scenario == scn, Index == dataset_index, Chain == chain_used)
+    } else {
+      for (v in seq(1, V)) {
+        if (v == 1) {
+          rel_ari <- .ari |>
+            dplyr::filter(Model == mod, Scenario == scn, Index == dataset_index, Chain == chain_used[v])
+        } else {
+          .entry <- .ari |>
+            dplyr::filter(Model == mod, Scenario == scn, Index == dataset_index, Chain == chain_used[v])
+          rel_ari <- rbind(rel_ari, .entry)
+        }
+      }
     }
 
-    rel_ari <- .ari |>
-      dplyr::filter(Model == mod, Scenario == scn, Index == dataset_index, Chain == chain_used)
+
     if ((ii == 1) & (jj == 1)) {
       ari_model_selection <- rel_ari
       phi_df <- rel_phis
@@ -129,7 +162,7 @@ for (ii in seq(1, n_files)) {
 #   }
 # }
 
-ari_df$View <- factor(ari_df$View)
+# ari_df$View <- factor(ari_df$View)
 ari_model_selection$View <- factor(ari_model_selection$View)
 ari_model_selection$Scenario <- factor(ari_model_selection$Scenario, levels = c("Gaussian", "MVT", "LogPoisson"), labels = c("Gaussian", "MVT", "Log-Poisson"))
 ari_model_selection$Model <- factor(ari_model_selection$Model,
@@ -178,7 +211,11 @@ p_ari <- ari_model_selection |> ggplot(aes(y = Model, x = ARI.test.labels, fill 
   labs(y = "ARI between inferred and true labels")
 # + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
 
-ggsave("./Simulations/PerfAcrossScenariosAndViews.png", p_ari, height = 8, width = 12)
+ggsave(paste0(save_dir, "PerfAcrossScenariosAndViews.png"),
+  plot = p_ari,
+  height = 8,
+  width = 12
+)
 
 # p_diff <- ari_df |>
 #   pivot_longer(c(Difference_unsupervised, Difference_mixture_model), names_prefix = "Difference_", values_to = "Difference", names_to = "Model") |>
