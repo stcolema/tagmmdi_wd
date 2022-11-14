@@ -85,7 +85,7 @@ model_output_dir <- "./T_gondii/ConsensusClustering/" #
 # === READ IN MODEL OUTPUT =====================================================
 cat("\n=== Reading in files ===================================================")
 
-mdi_file <- "./T_gondii/ConsensusClustering/CC_R_15000_K_125_full.rds"
+mdi_file <- "./T_gondii/ConsensusClustering/CC_R_15000_K_125_V_2_all_other_objects.rds"
 mix_file <- "./T_gondii/ConsensusClustering/CC_R_15000_K_300_cell_cycle_mix.rds"
 
 D <- 15000
@@ -190,40 +190,6 @@ mdi_mod$hypers[[2]]$amplitude[, filled_inds] |>
   log() |>
   boxplot()
 
-# === Visualise results =======================================================
-
-
-marker_labels <- label_to_organelle$Organelle[data_modelled$initial_labels[, 1]]
-marker_labels[data_modelled$fixed[, 1] == 0] <- NA
-
-anno_row <- data.frame(Localisation = factor(marker_labels, levels = sort(unique(marker_labels))))
-row.names(anno_row) <- row.names(data_modelled$data_modelled[[1]])
-
-ann_colours <- list(Localisation = viridis::viridis(26))
-names(ann_colours$Localisation) <- sort(unique(label_to_organelle$Organelle))
-
-pheatmap::pheatmap(data_modelled$data_modelled[[1]],
-  color = dataColPal(),
-  breaks = defineDataBreaks(data_modelled$data_modelled[[1]], dataColPal(), mid_point = 0),
-  annotation_row = anno_row,
-  annotation_colors = ann_colours,
-  show_rownames = FALSE,
-  cluster_cols = FALSE,
-  filename = "./T_gondii/Original_data/LOPIT_heatmap.png"
-)
-
-colnames(data_modelled$data_modelled[[2]]) <- paste0(seq(0, 12), " HR")
-pheatmap::pheatmap(data_modelled$data_modelled[[2]],
-  color = dataColPal(),
-  breaks = defineDataBreaks(data_modelled$data_modelled[[2]], dataColPal(), mid_point = 0),
-  # annotation_row = anno_row,
-  # annotation_colors = ann_colours,
-  show_rownames = FALSE,
-  cluster_cols = FALSE,
-  filename = "./T_gondii/Original_data/CellCycle_heatmap.png"
-)
-
-
 # === LOPIT ===================================================================
 
 # Compare MDI and TAGM allocations
@@ -242,6 +208,10 @@ label_to_organelle <- data.frame(
   "Organelle" = levels(tagm_comparison$markers)[-27],
   "Label" = seq(1, 26)
 )
+
+
+marker_labels <- label_to_organelle$Organelle[data_modelled$initial_labels[, 1]]
+marker_labels[data_modelled$fixed[, 1] == 0] <- NA
 
 # The MDI predictions and probability of allocation
 mdi_predictions <- label_to_organelle$Organelle[pred_cl[[1]]]
@@ -273,6 +243,23 @@ diagreement_uncertain_table$mdi.mcmc.probability <- diagreement_uncertain_table$
   round(digits = 3)
 
 write.csv(diagreement_uncertain_table, "~/Desktop/DisagreeingLocalisationsNonGolgiUncertain.csv")
+
+pm_localisation_options <- c("PM - integral", "PM - peripheral 1", "PM - peripheral 2")
+
+golgi_changes_to_pm <- tagm_comparison |> 
+  dplyr::filter(tagm.mcmc.allocation == "Golgi", mdi.mcmc.allocation %in% pm_localisation_options)
+
+pm_marker_proteins <- tagm_comparison |> 
+  dplyr::filter(markers %in% pm_localisation_options)
+
+golgi_marker_proteins <- tagm_comparison |> 
+  dplyr::filter(markers == "Golgi")
+
+golgi_changes_and_pm_markers <- rbind(pm_marker_proteins, golgi_changes_to_pm)
+golgi_changes_and_markers <- rbind(pm_marker_proteins, golgi_changes_to_pm, golgi_marker_proteins)
+
+write.csv(golgi_changes_and_pm_markers, "~/Desktop/DisagreeingChangesFromGolgi.csv")
+
 
 disagreeing_inds <- which(lopit_disagreement & non_golgi)
 diagreement_table <- tagm_comparison[disagreeing_inds, ]
@@ -852,6 +839,41 @@ unfused_predictions$Fixed <- fixed_inds[-fused_genes_1]
 
 # write.csv(fused_predictions[order(fused_predictions$Cell.cycle), ], file = "./T_gondii/Analysis/tGondiiFusedClusters.csv")
 # write.csv(unfused_predictions[order(unfused_predictions$Cell.cycle), ], file = "./T_gondii/Analysis/tGondiiUnfusedClusters.csv")
+
+
+# === Visualise results =======================================================
+
+
+marker_labels <- label_to_organelle$Organelle[data_modelled$initial_labels[, 1]]
+marker_labels[data_modelled$fixed[, 1] == 0] <- NA
+
+anno_row <- data.frame(Localisation = factor(marker_labels, levels = sort(unique(marker_labels))))
+row.names(anno_row) <- row.names(data_modelled$data_modelled[[1]])
+
+ann_colours <- list(Localisation = viridis::viridis(26))
+names(ann_colours$Localisation) <- sort(unique(label_to_organelle$Organelle))
+
+pheatmap::pheatmap(data_modelled$data_modelled[[1]],
+                   color = dataColPal(),
+                   breaks = defineDataBreaks(data_modelled$data_modelled[[1]], dataColPal(), mid_point = 0),
+                   annotation_row = anno_row,
+                   annotation_colors = ann_colours,
+                   show_rownames = FALSE,
+                   cluster_cols = FALSE,
+                   filename = "./T_gondii/Original_data/LOPIT_heatmap.png"
+)
+
+colnames(data_modelled$data_modelled[[2]]) <- paste0(seq(0, 12), " HR")
+pheatmap::pheatmap(data_modelled$data_modelled[[2]],
+                   color = dataColPal(),
+                   breaks = defineDataBreaks(data_modelled$data_modelled[[2]], dataColPal(), mid_point = 0),
+                   # annotation_row = anno_row,
+                   # annotation_colors = ann_colours,
+                   show_rownames = FALSE,
+                   cluster_cols = FALSE,
+                   filename = "./T_gondii/Original_data/CellCycle_heatmap.png"
+)
+
 
 # === Investigate cell cycle splitting/merging ======================================
 
