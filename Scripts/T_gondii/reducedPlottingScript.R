@@ -809,20 +809,22 @@ data_modelled$data_modelled[[2]][fused_genes_1, ]
 pred_cl[[1]][fused_genes_1]
 pred_cl[[2]][fused_genes_1]
 
-pred_df <- data.frame("LOPIT" = mdi_predictions, "Cell-cycle" = c(pred_cl[[2]]))
+cc_pred <- mdi_mod$cell_cycle_predictions[[2]][fused_genes_1]
+
+pred_df <- data.frame("LOPIT" = mdi_predictions, "Cell-cycle" = mdi_mod$cell_cycle_predictions$maxpear) # c(pred_cl[[2]]))
 row.names(pred_df) <- row.names(data_modelled$data_modelled[[1]])
 
 pred_df[fused_genes_1, ] |> table() # |> write.csv("~/Desktop/LOPIT_CellCycle_label_map.csv")
+print(xtable::xtable(table(pred_df[fused_genes_1, ])))
 
-
-dense_granule_cell_cycle <- which((pred_cl[[2]] == 5) & colMeans(mdi_mod$allocations[[1]] == mdi_mod$allocations[[2]]) > 0.5)
-dense_granule_cell_cycle <- which((pred_cl[[2]] == 3) & (model_output$MDI$fusion_probabilities[[1]] > 0.5))
+dense_granule_cell_cycle <- which((pred_cl[[2]] == 3) & colMeans(mdi_mod$allocations[[1]] == mdi_mod$allocations[[2]]) > 0.5)
+dense_granule_cell_cycle <- which((pred_cl[[2]] == 3) & (model_output$s[[1]] > 0.5))
 data_modelled$data_modelled[[2]][dense_granule_cell_cycle, ] |>
   pheatmap(
     cluster_cols = FALSE,
     show_colnames = FALSE,
     main = "Dense granule localised proteins cell-cycle data",
-    filename = "./T_gondii/Analysis/cell_cycle_dense_granules.png"
+    # filename = "./T_gondii/Analysis/cell_cycle_dense_granules.png"
   )
 
 rhoptries_1_cell_cycle <- which((pred_cl[[2]] == 14) & colMeans(mdi_mod$allocations[[1]] == mdi_mod$allocations[[2]]) > 0.5)
