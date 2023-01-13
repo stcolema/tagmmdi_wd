@@ -42,13 +42,13 @@ for (dataset in datasets) {
       knn_tl_f <- knn_tl_files[ii]
 
       .x <- readRDS(bayes_f)
-
+      N_test <- length(.x$test.idx)
       .mdi_df <- data.frame(
         "Model" = "MDI",
         "Accuracy" = .x$mdi_fold$prediction_scores$accuracy,
         "Macro_F1" = .x$mdi_fold$prediction_scores$macro_f1,
         "Weighted_F1" = .x$mdi_fold$prediction_scores$weighted_f1,
-        "Brier_loss" = .x$mdi_fold$quadloss,
+        "Brier_loss" = .x$mdi_fold$quadloss / N_test,
         "Seed" = .x$seed
       )
 
@@ -57,19 +57,19 @@ for (dataset in datasets) {
         "Accuracy" = .x$tagm_fold$prediction_scores$accuracy,
         "Macro_F1" = .x$tagm_fold$prediction_scores$macro_f1,
         "Weighted_F1" = .x$tagm_fold$prediction_scores$weighted_f1,
-        "Brier_loss" = .x$tagm_fold$quadloss,
+        "Brier_loss" = .x$tagm_fold$quadloss / N_test,
         "Seed" = .x$seed
       )
 
       .x <- readRDS(knn_tl_f)
-
+      N_test <- length(.x$test.idx)
 
       .knn_df <- data.frame(
         "Model" = "KNN_TL",
         "Accuracy" = .x$knn_fold$prediction_scores$accuracy,
         "Macro_F1" = .x$knn_fold$prediction_scores$macro_f1,
         "Weighted_F1" = .x$knn_fold$prediction_scores$weighted_f1,
-        "Brier_loss" = .x$knn_fold$quadloss,
+        "Brier_loss" = .x$knn_fold$quadloss / N_test,
         "Seed" = .x$seed
       )
 
@@ -112,10 +112,12 @@ long_result_df[["Test fraction"]] <- long_result_df$Test_frac * 0.01
 my_palette <- ggthemes::colorblind_pal()(4)[2:4]
 
 p_out <- long_result_df %>% 
+  filter(Score != "Weighted F1") |> 
   ggplot(aes(x = Model, y = Value)) +
   geom_boxplot(aes(fill = Model)) +
   facet_grid(Score ~ Dataset + `Test fraction`, scales = "free", labeller = label_both) +
-  scale_fill_manual(values = my_palette)
+  scale_fill_manual(values = my_palette) +
+  theme(legend.position = "bottom")
 
 write.csv(result_df, file = result_csv_file)
-ggsave(filename = result_plot_file, plot = p_out, width = 16, height = 8)
+ggsave(filename = result_plot_file, plot = p_out, width = 16, height = 7)
