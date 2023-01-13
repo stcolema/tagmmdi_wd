@@ -339,43 +339,18 @@ knnSingleFold <- function(MS_object,
   # Define the weights to be explored
   f_data_col <- "markers"
   m <- sort(unique(fData(MS_object)[["markers"]])) # $markers.tl)
-
-  # if(is.null(m)) {
-  #   f_data_col <- "markers.tl"
-  #   m <- sort(unique(fData(MS_object)[[f_data_col]])) # $markers)
-  # }
-
   m <- m[m != "unknown"]
 
   cat("\nNumber of classes:", length(m))
 
   # As for the HEK dataset theta explodes in size (and memory) and gets killed
   # on the HPC, we use this function which does not guarantee that the number of
-  # weights sampled is actually the desired amount as there can be reptition and
+  # weights sampled is actually the desired amount as there can be repetition and
   # we reduce to the unique rows.
   cat("\nSampling weight combinations.")
   th <- weightCombinations(length(m), number_weights,
     n_used = number_weights_sampled
   )
-
-  # n_combinations <- number_weights**length(m)
-  # subsetting_of_weights_intended <- ! is.null(number_weights_sampled)
-  # if(subsetting_of_weights_intended) {
-  #   cat("\nSampling weight combinations.")
-  #   number_weights_sampled <- min(number_weights_sampled, n_combinations)
-  #   subset_of_weights_considered <- number_weights_sampled != n_combinations
-  #   if(subset_of_weights_considered) {
-  #     th_used <- sample(seq(1, n_combinations),
-  #       size = number_weights_sampled,
-  #       replace = FALSE
-  #     )
-  #     th <- thetas(length(m), length.out = number_weights, verbose = FALSE)[th_used, ]
-  #   } else {
-  #     th <- thetas(length(m), length.out = number_weights, verbose = FALSE)
-  #   }
-  # } else {
-  #   th <- thetas(length(m), length.out = number_weights, verbose = FALSE)
-  # }
 
   t0 <- Sys.time()
 
@@ -602,16 +577,6 @@ d1 <- eval(parse(text = datasets[1]))
 d2 <- eval(parse(text = datasets[2]))
 
 cat("\nData loaded.")
-
-
-# marker.data <- pRoloc::markerMSnSet(d1)
-# cat("\nMarker data obtained.")
-# X <- pRoloc:::subsetAsDataFrame(marker.data, "markers", train = TRUE)
-
-# Number of samples modelled
-# N <- nrow(X)
-
-# d2 <- d2[, colSums(exprs(d2)) > categorical_column_threshold]
 
 cat("\n\n=== BEGIN MAIN FUNCTION ===========================================\n")
 

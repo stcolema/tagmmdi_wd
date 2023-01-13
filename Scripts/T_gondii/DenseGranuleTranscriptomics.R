@@ -288,12 +288,12 @@ model_output_dir <- "./T_gondii/ConsensusClustering/" #
 cat("\n=== Reading in files ===================================================")
 
 mdi_file <- "./T_gondii/ConsensusClustering/CC_R_15000_K_125_full.rds"
-mix_file <- "./T_gondii/ConsensusClustering/CC_R_15000_K_300_cell_cycle_mix.rds"
+# mix_file <- "./T_gondii/ConsensusClustering/CC_R_15000_K_300_cell_cycle_mix.rds"
 
 D <- 15000
 W <- 150
 mdi_mod <- readRDS(mdi_file)
-mix_mod <- readRDS(mix_file)
+# mix_mod <- readRDS(mix_file)
 V <- 2
 
 maxpear_cl <- mcclust::maxpear(mdi_mod$cm[[2]], max.k = 50)
@@ -486,7 +486,6 @@ unnormalised_cell_cycle_data <- scale(unnormalised_cell_cycle_data)
 
 colnames(unnormalised_cell_cycle_data) <- colnames(microarray_data)
 
-col_pal
 dg_breaks <- defineDataBreaks(unnormalised_cell_cycle_data[dg_indices, ], col_pal)
 annotatedHeatmap(unnormalised_cell_cycle_data[dg_markers, ], pred_cl[[2]][dg_markers],
                  my_breaks = dg_breaks,
@@ -505,6 +504,33 @@ annotatedHeatmap(unnormalised_cell_cycle_data[dg_indices, ], pred_cl[[2]][dg_ind
 )
 
 dg_markers <- tagm_comparison$markers[dg_indices] == "dense granules"
+
+annotation_row <- data.frame(Cluster = factor(pred_cl[[2]][dg_indices]),
+                             Markers = factor(dg_markers)
+)
+row.names(annotation_row) <- row.names(microarray_data[dg_indices, ])
+n_colors <- annotation_row$Cluster |> levels() |> length()
+annotation_colors <- list(
+  Cluster = Polychrome::green.armytage.colors(n_colors),
+  Markers = c("#FFFFFF", "#146EB4")
+)
+
+names(annotation_colors$Cluster) <- levels(annotation_row$Cluster)
+names(annotation_colors$Markers) <- levels(annotation_row$Markers)
+
+row_order <- order(annotation_row$Cluster)
+
+pheatmap(microarray_data[dg_indices, ][row_order, ], 
+         annotation_row = annotation_row, 
+         annotation_colors = annotation_colors, 
+         color = dataColPal(), 
+         breaks = defineDataBreaks(microarray_data, col_pal = dataColPal(), mid_point = 0),
+         cluster_rows = FALSE, 
+         cluster_cols = FALSE, 
+         show_rownames = FALSE,
+         main = "Dense granule co-expression patterns",
+         # filename = "~/Desktop/DGproteinsCoExpressionSortedByCluster.png"
+         )
 
 heatmap_input <- list(
   coexpression_data = as.matrix(microarray_data[dg_indices, ]),
@@ -540,7 +566,9 @@ p4 + plot_annotation(title = "Subset of dense granule proteins", subtitle = "Cel
 ggsave("~/Desktop/DG_proteins_cell_cycle_reduced_ordered_by_abundance.png", height = 8, width = 12)
 
 
-annoatedThreeLevels <- function(X, organelles, labels, markers, ...) {
+# === Invasive organelle proteins ==============================================
+
+annoatedThreeLevels <- function(X, organelles, labels, markers, row_order = NULL, ...) {
   
   # Make sure the appropriate objects are factors
   organelles <- factor(organelles)
@@ -548,9 +576,11 @@ annoatedThreeLevels <- function(X, organelles, labels, markers, ...) {
   markers <- factor(markers)
   
   # Create the annotation data.frame for the rows
-  annotation_row <- data.frame(Localisation = organelles,
-    Markers = markers,
-    Cluster = labels
+  annotation_row <- data.frame(
+    Cluster = labels,
+    Localisation = organelles,
+    Markers = markers
+    
   )
   row.names(annotation_row) <- row.names(X)
   
@@ -559,9 +589,9 @@ annoatedThreeLevels <- function(X, organelles, labels, markers, ...) {
   n_organelles <- length(levels(organelles))
   
   annotation_colors <- list(
-    Cluster = viridis::viridis(n_clusters),
+    Cluster = Polychrome::glasbey.colors(n_clusters), # viridis::viridis(n_clusters),
     Markers = c("#FFFFFF", "#146EB4"),
-    Localisation = viridis::viridis(n_organelles)
+    Localisation = ggthemes::colorblind_pal()(n_organelles) # viridis::viridis(n_organelles)
   )
   
   names(annotation_colors$Cluster) <- levels(labels)
@@ -570,6 +600,13 @@ annoatedThreeLevels <- function(X, organelles, labels, markers, ...) {
   
   col_pal <- dataColPal()
   my_breaks <- defineDataBreaks(X, col_pal, mid_point = 0)
+  
+  row_order_passed <- length(row_order) > 1
+  # row_order_passed <- ! is.null(row_order) 
+  if(row_order_passed) {
+    X <- X[row_order, ]
+  }
+  
   pheatmap::pheatmap(X, 
                      color = col_pal, 
                      breaks = my_breaks, 
@@ -581,23 +618,57 @@ annoatedThreeLevels <- function(X, organelles, labels, markers, ...) {
   )
   
 }
+
 rhoptry_proteins <- which(mdi_predictions %in% c("rhoptries 1", "rhoptries 2"))
 apical_proteins <- which(mdi_predictions %in% c("apical 1", "apical 2"))
-apical_rhoptry_indices <- c(rhoptry_proteins, apical_proteins)
+er_proteins <- which(mdi_predictions %in% c("ER", "ER 2"))
 
-localisations <- mdi_predictions[apical_rhoptry_indices]
-cluster_IDs <- pred_cl[[2]][apical_rhoptry_indices]
-apical_rhoptry_markers <- tagm_comparison$markers[apical_rhoptry_indices] != "unknown"
-apical_rhoptry_coexpression_data <- microarray_data[apical_rhoptry_indices, ]
+invasive_protein_indices <- c(rhoptry_proteins, apical_proteins, er_proteins)
 
-annoatedThreeLevels(apical_rhoptry_coexpression_data, 
-  localisations,
-  cluster_IDs,
-  apical_rhoptry_markers,
-  main = "Apical and rhoptry protein co-expression data",
-  filename = "~/Desktop/ApicalRhoprtryCoexpressionData.png"
+invasive_localisations <- mdi_predictions[invasive_protein_indices]
+invasive_cluster_IDs <- pred_cl[[2]][invasive_protein_indices]
+invasive_markers <- tagm_comparison$markers[invasive_protein_indices] != "unknown"
+invasive_coexpression_data <- microarray_data[invasive_protein_indices, ]
+colnames(invasive_coexpression_data) <- paste0(seq(0, 12), " HR")
+annoatedThreeLevels(invasive_coexpression_data, 
+                    invasive_localisations,
+                    invasive_cluster_IDs,
+                    invasive_markers,
+  # main = "Apical, rhoptry and ER proteins co-expression data",
+  row_order = order(invasive_cluster_IDs),
+  cluster_rows = FALSE #,
+  # filename = "~/Desktop/InvasiveCoexpressionDataNoTitle.png",
+  # width = 8,
+  # height = 10
 )
-# dev.off()
+dev.off()
+
+# small_clusters <- which(invasive_cluster_IDs > 22)
+# 
+# annoatedThreeLevels(invasive_coexpression_data[small_clusters, ], 
+#                     invasive_localisations[small_clusters],
+#                     invasive_cluster_IDs[small_clusters],
+#                     invasive_markers[small_clusters],
+#                     # main = "Apical, rhoptry and ER proteins co-expression data",
+#                     row_order = order(invasive_cluster_IDs[small_clusters]),
+#                     cluster_rows = FALSE #,
+#                     # filename = "~/Desktop/InvasiveCoexpressionDataNoTitle.png",
+#                     # width = 8,
+#                     # height = 10
+# )
+# 
 
 annotatedHeatmap(microarray_data[rhoptry_proteins, ], pred_cl[[2]][rhoptry_proteins])
 annotatedHeatmap(microarray_data[apical_proteins, ], pred_cl[[2]][apical_proteins])
+
+invasive_protein_df <- tagm_comparison[invasive_protein_indices, ]
+invasive_protein_df$Cell_cycle_cluster <- invasive_cluster_IDs
+invasive_protein_df <- invasive_protein_df[order(invasive_protein_df$mdi.mcmc.allocation), ]
+invasive_protein_df <- invasive_protein_df[, c(ncol(invasive_protein_df), seq(1, ncol(invasive_protein_df) - 1))]
+write.csv(invasive_protein_df, "~/Desktop/ApicalRhoptryERproteincs.csv")
+
+dense_granule_df <- tagm_comparison[dg_indices, ]
+dense_granule_df$Cell_cycle_cluster <- pred_cl[[2]][dg_indices]
+dense_granule_df <- dense_granule_df[order(dense_granule_df$mdi.mcmc.allocation), ]
+dense_granule_df <- dense_granule_df[, c(ncol(dense_granule_df), seq(1, ncol(dense_granule_df) - 1))]
+write.csv(dense_granule_df, "~/Desktop/DGproteincs.csv")

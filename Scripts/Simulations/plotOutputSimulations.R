@@ -12,9 +12,15 @@ input_arguments <- function() {
     # Convert all files in target destination (default is FALSE)
     optparse::make_option(c("--model_output_dir"),
       type = "character",
-      default = "./Simulations/Output",
+      default = "./Simulations/Output/",
       help = "Directory where the model outputs are saved.",
       metavar = "character"
+    ),
+    optparse::make_option(c("--save_dir"),
+                          type = "character",
+                          default = "./Simulations/Output/",
+                          help = "Directory where the plots will be saved.",
+                          metavar = "character"
     )
   )
 
@@ -28,6 +34,7 @@ mdiHelpR::setMyTheme()
 args <- input_arguments()
 
 out_dir <- args$model_output_dir
+save_dir <- args$save_dir
 selection_df <- read.csv(paste0(out_dir, "OutputChainsUsed.csv"))
 
 scenarios <- list.dirs(out_dir, full.names = F, recursive = F)
@@ -208,13 +215,15 @@ p_ari <- ari_model_selection |> ggplot(aes(y = Model, x = ARI.test.labels, fill 
   geom_boxplot() +
   facet_grid(Scenario ~ View, labeller = label_both) +
   ggthemes::scale_fill_colorblind() +
-  labs(y = "ARI between inferred and true labels")
+  labs(x = "ARI between inferred and true labels", y = NULL) +
+  theme(legend.position = "bottom") +
+  guides(fill=guide_legend(nrow=2, byrow=TRUE))
 # + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
 
 ggsave(paste0(save_dir, "PerfAcrossScenariosAndViews.png"),
   plot = p_ari,
-  height = 8,
-  width = 12
+  height = 7,
+  width = 10
 )
 
 # p_diff <- ari_df |>
