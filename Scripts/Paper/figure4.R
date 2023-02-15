@@ -491,6 +491,7 @@ mdi_probabilities <- prob_cl[[1]]
 tagm_comparison <- tagm_comparison[proteins_modelled, ]
 tagm_comparison$mdi.mcmc.allocation <- mdi_predictions
 tagm_comparison$mdi.mcmc.probability <- mdi_probabilities
+tagm_predictions <- tagm_comparison$tagm.mcmc.allocation
 
 # === T-SNE ====================================================================
 
@@ -689,6 +690,11 @@ annotatedHeatmap(dg_gene_expression_data[row_order, ][final_dg_gene_set, ], pred
 # === Biochemical properties ===================================================
 
 protein_biochemical_properties <- read.csv("./T_gondii/TGondiiGolgiProteinsAttributes.csv", row.names = 1)
+
+
+tagm_secretory_subset <- tagm_predictions %in% dense_granule_organelle
+tagm_secretory_proteins <- row.names(plot_df)[tagm_secretory_subset]
+all_secretory_proteins <- c(secretory_proteins, tagm_secretory_proteins) |> unique()
 
 rel_protein_biochemical_properties <- protein_biochemical_properties[dg_proteins, ]
 dg_tSNE_df <- plot_df[dg_proteins, ]

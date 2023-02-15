@@ -534,13 +534,15 @@ plot_df <- data.frame("tSNE_1" = my_tsne$Y[, 1], "tSNE_2" = my_tsne$Y[, 2], orga
 col_pal <- c(pals::alphabet(), "#808080")
 names(col_pal) <- marker_labels # c(names(pals::alphabet()), "grey50")
 
+plot_df$Alpha <- 0.6 * (plot_df$organelle != "all other proteins") + 0.3 * (plot_df$organelle == "all other proteins")
 p_tsne <- plot_df |>
   ggplot(aes(x = tSNE_1, y = tSNE_2, color = organelle)) +
-  geom_point(alpha = 0.4) +
+  geom_point(aes(alpha = Alpha)) +
   labs(x = "tSNE 1", y = "tSNE 2", color = "Markers") +
   theme(legend.position = "bottom") +
   scale_color_manual(values = col_pal) +
-  guides(color = guide_legend(ncol = 4))
+  guides(color = guide_legend(ncol = 4)) +
+  scale_alpha(guide = 'none')
 
 microarray_mat <- as.matrix(microarray_data)
 # colnames(microarray_mat) <- paste0("Hour ", seq(0, 12))
@@ -570,7 +572,7 @@ p_patch <- (p_tsne
 ) + plot_annotation(tag_levels = "A")
 
 
-ggsave("~/Desktop/Tagmmdi_fig_1.png", plot = p_patch, height = 9.0, width = 16.0)
+ggsave("Plots/fig3CaseTGondiiData.png", plot = p_patch, height = 9.0, width = 16.0)
 
 # lopit_data |>
 #   dplyr::mutate(Organelle = markers) |>

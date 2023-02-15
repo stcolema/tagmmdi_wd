@@ -123,7 +123,8 @@ p_performance <- long_result_df %>%
   ggplot(aes(x = Model, y = Value)) +
   geom_boxplot(aes(fill = Model)) +
   facet_grid(Score ~ Dataset, scales = "free") +
-  scale_fill_manual(values = my_palette) # +
+  scale_fill_manual(values = my_palette) + 
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) # +
 # theme(legend.position = "bottom")
 
 # write.csv(result_df, file = result_csv_file)
@@ -207,7 +208,14 @@ p_data_alt <- (p_callus + p_root) / (p_human + p_mouse) +
   plot_annotation(tag_levels = "A") +
   theme(legend.position = "bottom")
 
-p_final <- p_data_alt / p_performance +
-  plot_annotation(tag_levels = "A")
+layout <- c("
+  AABBEEE
+  CCDDEEE"
+)
 
-ggsave("~/Desktop/KNNTL_figure_2.png", plot = p_final, height = 9.0, width = 16.0)
+p_final <- p_callus + p_root + p_human + p_mouse + p_performance +
+  plot_annotation(tag_levels = "A") + 
+  plot_layout(design = layout) +
+  theme(legend.position = "bottom")
+
+ggsave("Plots/fig2ValidationStudy.png", plot = p_final, height = 9.0, width = 16.0)
