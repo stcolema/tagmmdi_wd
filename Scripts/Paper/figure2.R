@@ -98,7 +98,7 @@ result_df$Dataset <- factor(result_df$Dataset,
 )
 
 result_df$Model <- factor(result_df$Model,
-  labels = c("MDI", "TAGM", "TL"),
+  labels = c("MDI", "TAGM", "KNN TL"),
   levels = c("MDI", "TAGM", "KNN_TL")
 )
 
@@ -219,3 +219,9 @@ p_final <- p_callus + p_root + p_human + p_mouse + p_performance +
   theme(legend.position = "bottom")
 
 ggsave("Plots/fig2ValidationStudy.png", plot = p_final, height = 9.0, width = 16.0)
+
+ggsave("Plots/Fig2/fig2ACallus.pdf", plot = p_callus, height = 4.5, width = 6.0)
+ggsave("Plots/Fig2/fig2BRoot.pdf", plot = p_root, height = 4.5, width = 6.0)
+ggsave("Plots/Fig2/fig2CHuman.pdf", plot = p_human, height = 4.5, width = 6.0)
+ggsave("Plots/Fig2/fig2DMouse.pdf", plot = p_mouse, height = 4.5, width = 6.0)
+ggsave("Plots/Fig2/fig2EPerformance.pdf", plot = p_performance, height = 9.0, width = 8.0)

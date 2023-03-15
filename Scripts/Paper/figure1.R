@@ -546,7 +546,8 @@ p_tsne <- plot_df |>
 
 microarray_mat <- as.matrix(microarray_data)
 # colnames(microarray_mat) <- paste0("Hour ", seq(0, 12))
-p_ge <- ggPheatmap(microarray_mat, markers, col_pal, include_dendogram = FALSE)
+p_ge <- ggPheatmap(microarray_mat, markers, col_pal, include_dendogram = FALSE) +
+  labs(fill = "Gene\nco-expression")
 
 # p_tsne
 
@@ -572,8 +573,9 @@ p_patch <- (p_tsne
 ) + plot_annotation(tag_levels = "A")
 
 
-ggsave("Plots/fig3CaseTGondiiData.png", plot = p_patch, height = 9.0, width = 16.0)
-
+ggsave("Plots/Fig3/fig3CaseTGondiiData.pdf", plot = p_patch, height = 9.0, width = 16.0)
+ggsave("Plots/Fig3/fig3ACaseTGondiiDatatSNE.pdf", plot = p_tsne, height = 9.0, width = 8.0)
+ggsave("Plots/Fig3/fig3BCaseTGondiiDataGE.pdf", plot = p_ge, height = 9.0, width = 8.0)
 # lopit_data |>
 #   dplyr::mutate(Organelle = markers) |>
 #   dplyr::filter(Fixed == 1) |>

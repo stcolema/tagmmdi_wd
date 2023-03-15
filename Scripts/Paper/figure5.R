@@ -152,7 +152,7 @@ heatmapAnnotatedByClassAndBatch <- function(X, include_dendogram = TRUE, lead = 
       axis.title.x = ggplot2::element_text(angle = 90, vjust = 0.5, hjust = 1),
       plot.margin = ggplot2::margin(0, 0, 0, 0)
     ) +
-    labs(fill = "Marker", x = "Marker") +
+    labs(fill = "Cluster", x = "Cluster") +
     scale_fill_manual(values = c("#FFFFFF", "#146EB4"))
   # ggthemes::scale_fill_colorblind()
 
@@ -279,11 +279,11 @@ ggPheatmap <- function(X, markers, col_pal, row_order = NULL, include_dendogram 
   }
   data_levels <- c("Coexpression")
   protein_names <- factor(row.names(X), levels = row.names(X)[row_order])
-  annotation_row <- data.frame(Localisation = markers, ID = protein_names)
+  annotation_row <- data.frame(Marker = markers, ID = protein_names)
 
   rel_col_pal <- col_pal[names(col_pal) %in% unique(markers)]
   p_anno <- annotation_row |>
-    ggplot(aes(x = NA, y = ID, fill = Localisation)) +
+    ggplot(aes(x = NA, y = ID, fill = Marker)) +
     geom_tile() +
     ggplot2::theme(
       axis.text.x = ggplot2::element_blank(),
@@ -293,7 +293,7 @@ ggPheatmap <- function(X, markers, col_pal, row_order = NULL, include_dendogram 
       axis.title.x = ggplot2::element_text(angle = 90, vjust = 0.5, hjust = 1),
       plot.margin = ggplot2::margin(0, 0, 0, 0)
     ) +
-    labs(fill = "Localisation", x = "Localisation") +
+    labs(fill = "Cluster", x = "Cluster") +
     scale_fill_manual(values = rel_col_pal)
 
   # Order data based on clusters and sample types
@@ -428,10 +428,15 @@ mdi_mod <- readRDS(mdi_file)
 # mix_mod <- readRDS(mix_file)
 V <- 2
 
-maxpear_cl <- mcclust::maxpear(mdi_mod$cm[[2]], max.k = 50)
+vi_cl <- mcclust.ext::minVI(mdi_mod$cm[[2]], max.k = 50)
+vi_cb <- mcclust.ext::credibleball(vi_cl$cl, mdi_mod$allocations[[2]])
+
+# maxpear_cl <- mcclust::maxpear(mdi_mod$cm[[2]], max.k = 50)
 
 pred_cl <- mdi_mod$pred
-pred_cl[[2]] <- maxpear_cl$cl
+# pred_cl[[2]] <- maxpear_cl$cl
+pred_cl[[2]] <- vi_cl$cl
+
 prob_cl <- mdi_mod$prob
 fused_genes_1 <- which(colMeans(mdi_mod$allocations[[1]] == mdi_mod$allocations[[2]]) > 0.5)
 
@@ -493,96 +498,6 @@ tagm_comparison$mdi.mcmc.allocation <- mdi_predictions
 tagm_comparison$mdi.mcmc.probability <- mdi_probabilities
 tagm_predictions <- tagm_comparison$tagm.mcmc.allocation
 
-# === Golgi disagreements from TAGM ============================================
-#
-# lopit_disagreement <- tagm_comparison$mdi.mcmc.allocation != tagm_comparison$tagm.mcmc.allocation
-# tagm_uncertain <- tagm_comparison$tagm.mcmc.probability < 0.7
-# mdi_certain <- tagm_comparison$mdi.mcmc.probability > 0.7
-# non_golgi <- tagm_comparison$mdi.mcmc.allocation != "Golgi"
-# disagreeing_uncertain_inds <- which(lopit_disagreement & tagm_uncertain & non_golgi & mdi_certain)
-#
-# diagreement_uncertain_table <- tagm_comparison[disagreeing_uncertain_inds, ]
-#
-# diagreement_uncertain_table$tagm.mcmc.probability <- diagreement_uncertain_table$tagm.mcmc.probability |>
-#   round(digits = 3)
-# diagreement_uncertain_table$mdi.mcmc.probability <- diagreement_uncertain_table$mdi.mcmc.probability |>
-#   round(digits = 3)
-#
-# pm_localisation_options <- c("PM - integral", "PM - peripheral 1", "PM - peripheral 2")
-#
-# golgi_changes_to_pm <- tagm_comparison |>
-#   dplyr::filter(tagm.mcmc.allocation == "Golgi", mdi.mcmc.allocation %in% pm_localisation_options)
-#
-# pm_marker_proteins <- tagm_comparison |>
-#   dplyr::filter(markers %in% pm_localisation_options)
-#
-# golgi_marker_proteins <- tagm_comparison |>
-#   dplyr::filter(markers == "Golgi")
-#
-# golgi_changes_and_pm_markers <- rbind(pm_marker_proteins, golgi_changes_to_pm)
-# golgi_changes_and_markers <- rbind(pm_marker_proteins, golgi_changes_to_pm, golgi_marker_proteins)
-#
-# protein_biochemical_properties <- read.csv("./T_gondii/TGondiiGolgiProteinsAttributes.csv", row.names = 1)
-#
-# rel_protein_biochemical_properties <- protein_biochemical_properties[row.names(golgi_changes_and_markers), ]
-#
-# my_df <- cbind(golgi_changes_and_markers, rel_protein_biochemical_properties[, -c(2, 4, 5, 6)]) |>
-#   pivot_longer(c(mdi.mcmc.allocation, tagm.mcmc.allocation), names_to = "Model", values_to = "Allocation")
-#
-# my_df$pI <- as.numeric(my_df$pI)
-# my_df$Fixed <- my_df$markers != "unknown"
-# my_df |>
-#   ggplot(aes(x = Allocation, y = pI, group = Allocation)) +
-#   facet_grid(Model ~ Fixed) +
-#   geom_boxplot()
-#
-# p_dNdS <- my_df |>
-#   ggplot(aes(x = Allocation, y = dNdS, fill = Allocation)) +
-#   facet_grid(~Model) +
-#   geom_boxplot() +
-#   scale_fill_manual(values = ggthemes::colorblind_pal()(5)[-1])
-#
-#
-# my_df$Num.TMDs.TMHMM |> table()
-# my_df$TMD.within.first.60.AA <- my_df$TMD.within.first.60.AA != "FALSE"
-#
-# my_df |>
-#   filter(!Num.TMDs.TMHMM %in% c("Golgi", "PM - integral", "PM - peripheral 1", "PM - peripheral 2", "unknown")) |>
-#   mutate(Num.TMDs.TMHMM = as.numeric(Num.TMDs.TMHMM)) |>
-#   ggplot(aes(x = Allocation, y = Num.TMDs.TMHMM, group = Allocation)) +
-#   facet_grid(Model ~ Fixed) +
-#   geom_boxplot()
-#
-# my_df |>
-#   filter(!Num.TMDs.TMHMM %in% c("Golgi", "PM - integral", "PM - peripheral 1", "PM - peripheral 2", "unknown")) |>
-#   mutate(Num.TMDs.TMHMM = as.numeric(Num.TMDs.TMHMM)) |>
-#   ggplot(aes(x = Allocation, y = Num.TMDs.TMHMM, group = Allocation)) +
-#   facet_grid(~Model) +
-#   geom_boxplot()
-#
-# p_conservation_score <- my_df |>
-#   ggplot(aes(x = Allocation, y = Conservation.score, group = Allocation, fill = Allocation)) +
-#   facet_grid(~Model) +
-#   geom_boxplot() +
-#   scale_fill_manual(values = ggthemes::colorblind_pal()(5)[-1])
-#
-# p_num_tmds_TMHMM <- my_df |>
-#   filter(!Num.TMDs.TMHMM %in% c("Golgi", "PM - integral", "PM - peripheral 1", "PM - peripheral 2", "unknown")) |>
-#   mutate(Num.TMDs.TMHMM = as.numeric(Num.TMDs.TMHMM)) |>
-#   ggplot(aes(x = Allocation, y = Num.TMDs.TMHMM, group = Allocation, fill = Allocation)) +
-#   facet_grid(~Model) +
-#   geom_boxplot() +
-#   scale_fill_manual(values = ggthemes::colorblind_pal()(5)[-1])
-#
-# p_tmd_first_60_aa <- my_df |>
-#   ggplot(aes(y = TMD.within.first.60.AA, group = Allocation, fill = Allocation)) +
-#   facet_grid(~Model) +
-#   stat_count() +
-#   scale_fill_manual(values = ggthemes::colorblind_pal()(5)[-1])
-#
-# p_patch <- p_dNdS / p_conservation_score / p_num_tmds_TMHMM / p_tmd_first_60_aa + plot_layout(guides = "collect")
-
-
 # === T-SNE ====================================================================
 
 markers <- label_to_organelle$Organelle[data_modelled$initial_labels[, 1]]
@@ -619,7 +534,6 @@ marker_levels <- c(
   "20S proteasome",
   "unknown"
 )
-
 marker_labels <- c(
   "apical 1",
   "apical 2",
@@ -668,14 +582,13 @@ plot_df <- data.frame(
   Probability = localisation_probability
 ) |>
   mutate(Marker_protein = markers != "all other proteins")
-
 row.names(plot_df) <- row.names(tagm_comparison)
 
 col_pal <- c(pals::alphabet())
 names(col_pal) <- marker_labels[-27] # c(names(pals::alphabet()), "grey50")
 
 
-# plot_df[row.names(golgi_changes_and_markers),] |>
+# plot_df[row.names(golgi_changes_and_markers), ] |>
 #   dplyr::filter(tSNE_1 > -25) |>
 #   ggplot(aes(x = tSNE_1, y = tSNE_2, color = predicted_localisation, shape = Marker_protein)) +
 #   geom_point(aes(alpha = Probability), size = 3) +
@@ -683,7 +596,7 @@ names(col_pal) <- marker_labels[-27] # c(names(pals::alphabet()), "grey50")
 #   theme(legend.position = "bottom") +
 #   scale_color_manual(values = col_pal) +
 #   guides(color = guide_legend(ncol = 4))
-#
+
 # p_tsne <- plot_df |>
 #   ggplot(aes(x = tSNE_1, y = tSNE_2, color = predicted_localisation)) +
 #   geom_point(aes(alpha = Probability)) +
@@ -692,9 +605,9 @@ names(col_pal) <- marker_labels[-27] # c(names(pals::alphabet()), "grey50")
 #   scale_color_manual(values = col_pal) +
 #   guides(color = guide_legend(ncol = 4)) +
 #   facet_zoom(xy = predicted_localisation %in% secretory_organelles)
-#
+
 microarray_mat <- as.matrix(microarray_data)
-#
+
 # microarray_data |>
 #   rownames_to_column("Gene") |>
 #   mutate(Marker = markers, Predicted_localisation = predicted_localisation, Marker_protein = markers != "all other proteins") |>
@@ -703,8 +616,8 @@ microarray_mat <- as.matrix(microarray_data)
 #   ggplot(aes(x = Timepoint, y = Expression, group = Gene, color = Marker_protein)) +
 #   geom_line() +
 #   facet_wrap(~Predicted_localisation)
-#
-# exprs(Barylyuk2020ToxoLopit)[proteins_modelled,] |>
+
+# exprs(Barylyuk2020ToxoLopit)[proteins_modelled, ] |>
 #   as.data.frame() |>
 #   rownames_to_column("Protein") |>
 #   mutate(Marker = markers, Predicted_localisation = predicted_localisation, Marker_protein = markers != "all other proteins") |>
@@ -713,220 +626,198 @@ microarray_mat <- as.matrix(microarray_data)
 #   ggplot(aes(x = Timepoint, y = Expression, group = Protein, color = Marker_protein)) +
 #   geom_line() +
 #   facet_wrap(~Predicted_localisation)
-#   # geom_smooth(method = "loess", se = FALSE)
-#
-# golgi_reallocations_subset <- match(row.names(golgi_changes_and_markers), row.names(microarray_mat))
-# golgi_reallocated_ge_data <- microarray_mat[golgi_reallocations_subset, ]
-# golgi_new_predictions <- predicted_localisation[golgi_reallocations_subset]
-#
-#
-# p_ge <- ggPheatmap(golgi_reallocated_ge_data, golgi_new_predictions, col_pal,
-#                    include_dendogram = FALSE
-# )
+# geom_smooth(method = "loess", se = FALSE)
 
-# === Secretory organelles =====================================================
+# === Dense granules ===========================================================
 
-secretory_organelles <- c(
-  "apical 1",
-  "apical 2",
-  "micronemes",
-  "rhoptries 1",
-  "rhoptries 2",
-  "ER 1",
-  "ER 2"
+dense_granule_organelle <- c(
+  "dense granules"
 )
 
-secretory_subset <- predicted_localisation %in% secretory_organelles
-secretory_proteins <- row.names(plot_df)[secretory_subset]
+dg_subset <- predicted_localisation %in% dense_granule_organelle
+dg_proteins <- row.names(plot_df)[dg_subset]
+dg_gene_expression_data <- microarray_mat[dg_proteins, ]
+dg_predictions <- predicted_localisation[dg_subset]
 
-secretory_gene_expression_data <- microarray_mat[secretory_subset, ]
-secretory_predictions <- predicted_localisation[secretory_subset]
-
-
-p_tsne_full <- plot_df |>
+p_tsne <- plot_df |>
   ggplot(aes(x = tSNE_1, y = tSNE_2, color = predicted_localisation)) +
-  geom_point(alpha = 0.4) +
-  labs(x = "tSNE 1", y = "tSNE 2", color = "Localisation") +
-  scale_color_manual(values = col_pal, drop = FALSE) +
+  geom_point(alpha = 0.8) +
+  labs(x = "tSNE 1", y = "tSNE 2", color = "Markers") +
   theme(legend.position = "bottom") +
-  guides(color = guide_legend(ncol = 4))
-# facet_zoom(xy = predicted_localisation %in% secretory_organelles)
+  scale_color_manual(values = col_pal) +
+  guides(color = guide_legend(ncol = 4)) # +
+  # facet_zoom(xy = predicted_localisation %in% dense_granule_organelle)
 
-p_tsne_seccretory <- plot_df |>
-  dplyr::filter(predicted_localisation %in% secretory_organelles) |>
+p_tsne_dg <- plot_df |>
   ggplot(aes(x = tSNE_1, y = tSNE_2, color = predicted_localisation)) +
-  geom_point(alpha = 0.4) +
-  labs(x = "tSNE 1", y = "tSNE 2", color = "Localisation") +
-  scale_color_manual(values = col_pal, drop = FALSE, guide = "none") +
-  theme(legend.position = "bottom") # +
-# guides(color = guide_legend(ncol = 4))
+  geom_point(alpha = 0.8) +
+  labs(x = "tSNE 1", y = "tSNE 2", color = "Markers") +
+  theme(legend.position = "bottom") +
+  scale_color_manual(values = col_pal) +
+  guides(color = guide_legend(ncol = 4)) +
+  coord_cartesian(xlim = c(-0, 20), ylim = c(-12, 17.5)) 
+# facet_zoom(xy = predicted_localisation %in% dense_granule_organelle)
+
+p_tsne_dg2 <- plot_df |>
+  mutate(GE_cluster = factor(pred_cl[[2]])) |> 
+  filter(predicted_localisation == "dense granules") |> 
+  ggplot(aes(x = tSNE_1, y = tSNE_2, color = GE_cluster)) +
+  geom_point(alpha = 0.8) +
+  labs(x = "tSNE 1", y = "tSNE 2", color = "Markers") +
+  theme(legend.position = "bottom") +
+  scale_color_manual(values = col_pal) +
+  guides(color = guide_legend(ncol = 4)) +
+  coord_cartesian(xlim = c(-0, 20), ylim = c(-12, 17.5)) 
+# facet_zoom(xy = predicted_localisation %in% dense_granule_organelle)
+
 
 row_order <- c()
-for (organelle in secretory_organelles) {
-  curr_proteins <- which(secretory_predictions == organelle)
-  organelle_gene_expression_data <- secretory_gene_expression_data[curr_proteins, ]
+for (organelle in dense_granule_organelle) {
+  curr_proteins <- which(dg_predictions == organelle)
+  organelle_gene_expression_data <- dg_gene_expression_data[curr_proteins, ]
   ordered_indices <- findOrder(organelle_gene_expression_data)
   row_order <- c(row_order, curr_proteins[ordered_indices])
 }
 
-# row_order <- order(secretory_predictions)
-
-p_ge <- ggPheatmap(secretory_gene_expression_data,
-  secretory_predictions,
+# row_order <- order(dg_predictions)
+dg_clusters_ge <- factor(pred_cl[[2]][dg_subset])
+ge_col_pal <- Polychrome::green.armytage.colors(length(unique(dg_clusters_ge)))
+names(ge_col_pal) <- levels(dg_clusters_ge)
+p_ge <- ggPheatmap(dg_gene_expression_data,
+  dg_clusters_ge,
   row_order = row_order,
-  col_pal = col_pal,
+  col_pal = ge_col_pal,
   include_dendogram = FALSE
-) + 
+) +
   labs(fill = "Gene\nexpression")
 
-# outlier_rhoptry_proteins <- c("TGME49_294630",
-#                               "TGME49_261440",
-#                               "TGME49_270320",
-#                               "TGME49_246550",
-#                               "TGME49_215775",
-#                               "TGME49_315160",
-#                               "TGME49_209985",
-#                               "TGME49_210095"
-#                               )
-#
-# rhoptries_proteins <- which(secretory_predictions %in% c("rhoptries 1", "rhoptries 2"))
-# annotatedHeatmap(secretory_gene_expression_data[rhoptries_proteins, ][outlier_rhoptry_proteins, ],
-#   secretory_predictions[rhoptries_proteins][outlier_rhoptry_proteins],
-#   cluster_cols = FALSE)
-# findOrder(secretory_gene_expression_data[rhoptries_proteins, ])
-#
-# plot_df[outlier_rhoptry_proteins, ] |>
-#   ggplot(aes(x = tSNE_1, y = tSNE_2, color = predicted_localisation)) +
-#   geom_point(alpha = 0.4) +
-#   labs(x = "tSNE 1", y = "tSNE 2", color = "Predicted localisation") +
-#   theme(legend.position = "bottom") +
-#   scale_color_manual(values = col_pal) +
-#   guides(color = guide_legend(ncol = 4)) #+
-#
-# outlier_micronemes <- plot_df |>
-#   filter(tSNE_1 > 17, tSNE_1 < 19, tSNE_2 < -22, tSNE_2 > -25) |>
-#   row.names()
-#
-# outlier_micronemes_inds <- which(names(secretory_predictions) %in% outlier_micronemes)
-# annotatedHeatmap(secretory_gene_expression_data[outlier_micronemes_inds, ],
-#                  secretory_predictions[outlier_micronemes_inds],
-#                  include_rownames = FALSE, cluster_cols = FALSE)
+kept_clusters <- levels(dg_clusters_ge)[table(dg_clusters_ge) > 10]
+kept_genes <- which(dg_clusters_ge %in% kept_clusters)
 
-# colnames(microarray_mat) <- paste0("Hour ", seq(0, 12))
-# p_ge <- ggPheatmap(microarray_mat, predicted_localisation, col_pal, include_dendogram = FALSE)
+# annotatedHeatmap(dg_gene_expression_data[kept_genes, ], dg_clusters_ge[kept_genes])
+
+# p_tsne
+# p_ge
+
+# group_1 <- seq(1, 15)
+# group_2 <- seq(71, 78)
+# group_3 <- seq(110, 134)
+# group_4 <- c(seq(16, 70), seq(79, 109))
+# 
+# n_group_1 <- length(group_1)
+# n_group_2 <- length(group_2)
+# n_group_3 <- length(group_3)
+# n_group_4 <- length(group_4)
+
+# group_ordering <- c(
+#   group_1,
+#   group_2,
+#   group_3,
+#   group_4
+# )
+# 
+# merged_clusters <- c(
+#   rep(1, n_group_1),
+#   rep(2, n_group_2),
+#   rep(3, n_group_3),
+#   rep(4, n_group_4)
+# )
+# 
+# dg_gene_expression_data[row_order, ][group_1, ] |> pheatmap::pheatmap(cluster_cols = FALSE, cluster_rows = FALSE)
+# dg_gene_expression_data[row_order, ][group_2, ] |> pheatmap::pheatmap(cluster_cols = FALSE, cluster_rows = FALSE)
+# dg_gene_expression_data[row_order, ][group_3, ] |> pheatmap::pheatmap(cluster_cols = FALSE, cluster_rows = FALSE)
+# dg_gene_expression_data[row_order, ][group_4, ] |> pheatmap::pheatmap(cluster_cols = FALSE, cluster_rows = FALSE)
+# 
+# clusters_considered <- as.numeric(names(which(table(pred_cl[[2]][dg_subset]) > 2)))
+# final_dg_gene_set <- pred_cl[[2]][dg_subset][row_order] %in% clusters_considered
+# 
+# annotatedHeatmap(dg_gene_expression_data[row_order, ][final_dg_gene_set, ], pred_cl[[2]][dg_subset][row_order][final_dg_gene_set], cluster_cols = FALSE, cluster_rows = FALSE)
+# pheatmap::pheatmap(dg_gene_expression_data[row_order, ][group_ordering, ], cluster_cols = FALSE, cluster_rows = FALSE)
+# annotatedHeatmap(dg_gene_expression_data[row_order, ][group_ordering, ], merged_clusters, cluster_cols = FALSE, cluster_rows = FALSE)
+# 
+# lg_hg_clusters <- c(merged_clusters == 4) * 1 + 1
+# lg_hg_clusters <- c((merged_clusters == 3 * 1) + ((merged_clusters == 4) * 2) + 1)
+# annotatedHeatmap(dg_gene_expression_data[row_order, ][group_ordering, ], lg_hg_clusters, cluster_cols = FALSE, cluster_rows = FALSE)
 
 # === Biochemical properties ===================================================
 
 protein_biochemical_properties <- read.csv("./T_gondii/TGondiiGolgiProteinsAttributes.csv", row.names = 1)
 
-tagm_secretory_subset <- tagm_predictions %in% secretory_organelles
-tagm_secretory_proteins <- row.names(plot_df)[tagm_secretory_subset]
-all_secretory_proteins <- c(secretory_proteins, tagm_secretory_proteins) |> unique()
+tagm_dg_subset <- tagm_predictions %in% dense_granule_organelle
+tagm_dg_proteins <- row.names(plot_df)[tagm_dg_subset]
+all_dg_proteins <- c(dg_proteins, tagm_dg_proteins) |> unique()
 
-rel_protein_biochemical_properties <- protein_biochemical_properties[all_secretory_proteins, ]
-secretory_tSNE_df <- plot_df[all_secretory_proteins, ]
+rel_protein_biochemical_properties <- protein_biochemical_properties[dg_proteins, ]
+dg_tSNE_df <- plot_df[dg_proteins, ]
 
-secretory_df <- cbind(secretory_tSNE_df, rel_protein_biochemical_properties[, -c(2, 4)]) |>
-  pivot_longer(c(predicted_localisation, tagm.mcmc.allocation), names_to = "Prediction_origin", values_to = "Localisation") |>
-  dplyr::mutate(Model = ifelse(Prediction_origin == "predicted_localisation", "MDI", "TAGM"))
+dg_df <- cbind(dg_tSNE_df, rel_protein_biochemical_properties[, -c(2, 4)])
+dg_df$GE_cluster <- dg_clusters_ge
+# |>
+# pivot_longer(c(mdi.mcmc.allocation, tagm.mcmc.allocation), names_to = "Model", values_to = "Allocation")
 
-secretory_df$pI <- as.numeric(secretory_df$pI)
-secretory_df$Fixed <- secretory_df$markers != "all other proteins"
-p_pI <- secretory_df |>
-  dplyr::filter(Localisation %in% secretory_organelles) |>
-  ggplot(aes(x = Localisation, y = log(1 + pI), fill = Model)) +
-  # facet_wrap(~Model) +
-  geom_boxplot() 
-  # scale_fill_manual(values = col_pal)
+reduced_dg_df <- dg_df |> 
+  filter(GE_cluster %in% kept_clusters)
 
-# x12 <- secretory_df |> 
-#   dplyr::filter(Localisation == "ER 2", Model == "MDI") |>
-#   dplyr::select(dNdS) 
-# hist(x12$dNdS)
+# reduced_dg_df <- dg_df[row_order, ][group_ordering, ]
+# reduced_dg_df$Merged_cluster <- factor(lg_hg_clusters)
 
-p_dNdS <- secretory_df |>
-  dplyr::filter(Localisation %in% secretory_organelles) |>
-  ggplot(aes(x = Localisation, y = log(1 + dNdS), fill = Model)) +
-  geom_boxplot(alpha = 0.5) +
-  # facet_wrap(~ Localisation) +
-  # scale_fill_manual(values = col_pal) +
-  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)) +
-  theme(legend.position = "bottom")
-
-secretory_df$Num.TMDs.TMHMM |> table()
-secretory_df$TMD.within.first.60.AA <- my_df$TMD.within.first.60.AA != "FALSE"
-
-p_num_tmds_TMHMM <- secretory_df |>
-  dplyr::filter(Localisation %in% secretory_organelles) |>
-  filter(!Num.TMDs.TMHMM %in% c("apical 2", "ER 1", "ER 2", "micronemes", "rhoptries 2", "unknown")) |>
-  mutate(Num.TMDs.TMHMM = as.numeric(Num.TMDs.TMHMM)) |>
-  ggplot(aes(x = Localisation, y = Num.TMDs.TMHMM, fill = Localisation)) +
-  facet_wrap(~Model) +
+reduced_dg_df$pI <- as.numeric(reduced_dg_df$pI)
+dg_df$Fixed <- dg_df$markers != "all other proteins"
+p_pI <- reduced_dg_df |>
+  ggplot(aes(x = GE_cluster, y = log(1 + pI), fill = GE_cluster)) +
+  # facet_wrap(~ Fixed) +
   geom_boxplot() +
-  scale_fill_manual(values = col_pal)
+  geom_jitter() +
+  scale_fill_manual(values = ge_col_pal)
 
-p_conservation_score <- secretory_df |>
-  dplyr::filter(Localisation %in% secretory_organelles) |>
-  ggplot(aes(x = Localisation, y = Conservation.score, fill = Localisation)) +
-  facet_grid(~Model) +
+p_dNdS <- reduced_dg_df |>
+  ggplot(aes(x = GE_cluster, y = log(1 + dNdS), fill = GE_cluster)) +
   geom_boxplot() +
-  scale_fill_manual(values = col_pal)
+  scale_fill_manual(values = ge_col_pal) +
+  labs(x = "Inferred cluster") +
+  theme(legend.position = "None")
 
-p_tmd_first_60_aa <- secretory_df |>
-  dplyr::filter(Localisation %in% secretory_organelles) |>
-  ggplot(aes(y = TMD.within.first.60.AA, group = Localisation, fill = Localisation)) +
-  stat_count() +
-  facet_grid(~Model) +
-  scale_fill_manual(values = col_pal)
+# dg_df$Num.TMDs.TMHMM |> table()
+# dg_df$TMD.within.first.60.AA <- my_df$TMD.within.first.60.AA != "FALSE"
 
-p_patch <- p_dNdS / p_conservation_score / p_num_tmds_TMHMM / p_tmd_first_60_aa + plot_layout(guides = "collect")
+# p_num_tmds_TMHMM <- dg_df |>
+#   filter(!Num.TMDs.TMHMM %in% c("apical 2", "ER 1", "ER 2", "micronemes", "rhoptries 2", "unknown")) |>
+#   mutate(Num.TMDs.TMHMM = as.numeric(Num.TMDs.TMHMM)) |>
+#   ggplot(aes(x = predicted_localisation, y = Num.TMDs.TMHMM, fill = predicted_localisation)) +
+#   facet_wrap(~Fixed) +
+#   geom_boxplot() +
+#   scale_fill_manual(values = col_pal)
 
-# === Save plots ===============================================================
+# p_conservation_score <- dg_df |>
+#   ggplot(aes(x = predicted_localisation, y = Conservation.score, fill = predicted_localisation)) +
+#   # facet_grid(~Model) +
+#   geom_boxplot() +
+#   scale_fill_manual(values = col_pal)
+# 
+# p_tmd_first_60_aa <- dg_df |>
+#   ggplot(aes(y = TMD.within.first.60.AA, group = predicted_localisation, fill = predicted_localisation)) +
+#   stat_count() +
+#   scale_fill_manual(values = col_pal)
+
+# === Save plots ==============================================================
+# p_patch <- p_dNdS / p_conservation_score / p_num_tmds_TMHMM / p_tmd_first_60_aa + plot_layout(guides = "collect")
+
 layout <- c("
-  AB
-  CD
+  BC
+  DC
 ")
-p_full <- (p_tsne_full + p_tsne_seccretory + p_ge + p_dNdS) +
+
+p_full <- (p_tsne_dg + p_ge + p_dNdS) +
   plot_layout(design = layout) # & #, guides = "collect") &
 # theme(legend.position = "bottom")
 # p_ge
 
-# ggsave("Plots/Fig4/fig4SecretoryOrganelles.png", plot = p_full, height = 12.0, width = 16.0)
-# ggsave("Plots/Fig4/fig4CSecretoryOrganellesGE.png", plot = p_ge, height = 6.0, width = 8.0)
-# ggsave("Plots/Fig4/fig4ASecretoryOrganellestSNEFull.png", plot = p_tsne_full, height = 6.0, width = 8.5)
-# ggsave("Plots/Fig4/fig4BSecretoryOrganellestSNESecretory.png", plot = p_tsne_seccretory, height = 6.0, width = 8.0)
+ggsave("Plots/fig5DenseGranules.png", plot = p_full, height = 10.0, width = 16.0)
 
-ggsave("Plots/Fig4/fig4CSecretoryOrganellesGE.pdf", plot = p_ge, height = 6.0, width = 8.0)
-ggsave("Plots/Fig4/fig4ASecretoryOrganellestSNEFull.pdf", plot = p_tsne_full, height = 6.0, width = 8.5)
-ggsave("Plots/Fig4/fig4BSecretoryOrganellestSNESecretory.pdf", plot = p_tsne_seccretory, height = 6.0, width = 8.0)
-ggsave("Plots/Fig4/fig4DSecretoryOrganellesdNdS.pdf", plot = p_dNdS, height = 6.0, width = 8.0)
+ggsave("Plots/Fig5/fig5AtSNE.png", plot = p_tsne_dg, height = 5.0, width = 8.0)
+ggsave("Plots/Fig5/fig5BGE.png", plot = p_ge, height = 10.0, width = 8.0)
+ggsave("Plots/Fig5/fig5CdNdS.png", plot = p_dNdS, height = 5.0, width = 8.0)
 
-# # === Additional EDA ===========================================================
-# 
-# outlier_rhoptry_proteins
-# 
-# rhoptry_inds <- which(predicted_localisation %in% c("rhoptries 1", "rhoptries 2"))
-# rhoptry_proteins <- row.names(plot_df)[rhoptry_inds]
-# 
-# rhoptry_df <- secretory_df[rhoptry_proteins, ] |>
-#   mutate(Outlier = rhoptry_proteins %in% outlier_rhoptry_proteins)
-# 
-# rhoptry_df |>
-#   ggplot(aes(x = predicted_localisation, y = Conservation.score, fill = predicted_localisation)) +
-#   facet_grid(~Outlier) +
-#   geom_boxplot() +
-#   scale_fill_manual(values = col_pal)
-# 
-# 
-# rhoptry_df |>
-#   ggplot(aes(x = predicted_localisation, y = log(pI), fill = predicted_localisation)) +
-#   facet_grid(~Outlier) +
-#   geom_boxplot() +
-#   scale_fill_manual(values = col_pal)
-# 
-# rhoptry_df |>
-#   ggplot(aes(x = predicted_localisation, y = log(dNdS), fill = predicted_localisation)) +
-#   facet_grid(~Outlier) +
-#   geom_boxplot() +
-#   geom_jitter() +
-#   scale_fill_manual(values = col_pal)
+ggsave("Plots/Fig5/fig5AtSNE.pdf", plot = p_tsne_dg, height = 5.0, width = 8.0)
+ggsave("Plots/Fig5/fig5BGE.pdf", plot = p_ge, height = 10.0, width = 8.0)
+ggsave("Plots/Fig5/fig5CdNdS.pdf", plot = p_dNdS, height = 5.0, width = 8.0)
