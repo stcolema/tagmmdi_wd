@@ -798,7 +798,7 @@ pred_cl[[2]][fused_genes_1]
 
 cc_pred <- mdi_mod$cell_cycle_predictions[[2]][fused_genes_1]
 
-pred_df <- data.frame("LOPIT" = mdi_predictions, "Cell-cycle" = mdi_mod$cell_cycle_predictions$maxpear) # c(pred_cl[[2]]))
+pred_df <- data.frame("LOPIT" = mdi_predictions, "Cell-cycle" = mdi_mod$cell_cycle_predictions$vi) # c(pred_cl[[2]]))
 row.names(pred_df) <- row.names(data_modelled$data_modelled[[1]])
 
 pred_df[fused_genes_1, ] |> table() # |> write.csv("~/Desktop/LOPIT_CellCycle_label_map.csv")

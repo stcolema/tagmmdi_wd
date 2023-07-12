@@ -402,11 +402,11 @@ mdi_mod <- readRDS(mdi_file)
 # mix_mod <- readRDS(mix_file)
 V <- 2
 
-maxpear_cl <- mcclust::maxpear(mdi_mod$cm[[2]], max.k = 50)
+min_vi_cl <- mcclust.ext::minVI(mdi_mod$cm[[2]], max.k = 50)
 
 
 pred_cl <- mdi_mod$pred
-pred_cl[[2]] <- maxpear_cl$cl
+pred_cl[[2]] <- min_vi_cl$cl
 prob_cl <- mdi_mod$prob
 fused_genes_1 <- which(colMeans(mdi_mod$allocations[[1]] == mdi_mod$allocations[[2]]) > 0.5)
 

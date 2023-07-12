@@ -1,5 +1,4 @@
-
-suppressMessages(library(tagmReDraft))
+suppressMessages(library(mdir))
 suppressMessages(library(mdiHelpR))
 suppressMessages(library(ggplot2))
 suppressMessages(library(tidyr))
@@ -17,10 +16,10 @@ input_arguments <- function() {
       metavar = "character"
     ),
     optparse::make_option(c("--save_dir"),
-                          type = "character",
-                          default = "./Simulations/Output/",
-                          help = "Directory where the plots will be saved.",
-                          metavar = "character"
+      type = "character",
+      default = "./Simulations/Output/",
+      help = "Directory where the plots will be saved.",
+      metavar = "character"
     )
   )
 
@@ -211,13 +210,14 @@ phi_df |>
   geom_boxplot() +
   ggthemes::scale_fill_colorblind()
 
+ari_model_selection$Dataset <- ari_model_selection$View
 p_ari <- ari_model_selection |> ggplot(aes(y = Model, x = ARI.test.labels, fill = Model)) +
   geom_boxplot() +
-  facet_grid(Scenario ~ View, labeller = label_both) +
+  facet_grid(Scenario ~ Dataset, labeller = label_both) +
   ggthemes::scale_fill_colorblind() +
   labs(x = "ARI between inferred and true labels", y = NULL) +
   theme(legend.position = "bottom") +
-  guides(fill=guide_legend(nrow=2, byrow=TRUE))
+  guides(fill = guide_legend(nrow = 2, byrow = TRUE))
 # + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
 
 ggsave(paste0(save_dir, "PerfAcrossScenariosAndViews.png"),
@@ -225,6 +225,14 @@ ggsave(paste0(save_dir, "PerfAcrossScenariosAndViews.png"),
   height = 7,
   width = 10
 )
+
+ggsave(paste0(save_dir, "PerfAcrossScenariosAndViews.pdf"),
+  plot = p_ari,
+  device = "pdf",
+  height = 7,
+  width = 10
+)
+
 
 # p_diff <- ari_df |>
 #   pivot_longer(c(Difference_unsupervised, Difference_mixture_model), names_prefix = "Difference_", values_to = "Difference", names_to = "Model") |>

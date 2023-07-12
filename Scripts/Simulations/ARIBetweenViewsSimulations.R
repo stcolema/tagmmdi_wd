@@ -1,6 +1,6 @@
 
 library(ggplot2)
-library(tagmReDraft)
+library(mdir)
 
 mdiHelpR::setMyTheme()
 
@@ -33,11 +33,14 @@ long_ari_df <- ari_df |>
   pivot_longer(-Scenario, names_to = "Views", values_to = "ARI")
 
 long_ari_df$Views <- factor(long_ari_df$Views, labels = c("(1, 2)", "(1, 3)", "(2, 3)"))
+long_ari_df$Datasets <- long_ari_df$Views
+
 
 p_view_comp <- long_ari_df |>
-  ggplot(aes(x = Views, y = ARI, fill = Views)) +
+  ggplot(aes(x = Datasets, y = ARI, fill = Datasets)) +
   geom_boxplot() +
   ggthemes::scale_fill_colorblind() +
   ylim(c(0, 1))
 
-ggsave("./Simulations/ComparisonTrueClusterings.png", p_view_comp, height = 6, width = 6)
+ggsave("./Plots/SimData/ARI/ComparisonTrueClusterings.png", p_view_comp, height = 6, width = 6)
+ggsave("./Plots/SimData/ARI/ComparisonTrueClusterings.pdf", p_view_comp, height = 6, width = 6, device = "pdf")

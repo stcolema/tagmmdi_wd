@@ -431,10 +431,7 @@ V <- 2
 vi_cl <- mcclust.ext::minVI(mdi_mod$cm[[2]], max.k = 50)
 vi_cb <- mcclust.ext::credibleball(vi_cl$cl, mdi_mod$allocations[[2]])
 
-# maxpear_cl <- mcclust::maxpear(mdi_mod$cm[[2]], max.k = 50)
-
 pred_cl <- mdi_mod$pred
-# pred_cl[[2]] <- maxpear_cl$cl
 pred_cl[[2]] <- vi_cl$cl
 
 prob_cl <- mdi_mod$prob

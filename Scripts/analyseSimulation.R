@@ -2,9 +2,9 @@
 
 suppressMessages(library(tagmReDraft))
 suppressMessages(library(mdiHelpR))
-# suppressMessages(library(batchmix))
 suppressMessages(library(magrittr))
 suppressMessages(library(mcclust))
+suppressMessages(library(mcclust.ext))
 suppressMessages(library(tidyr))
 suppressMessages(library(ggplot2))
 suppressMessages(library(magrittr))
@@ -330,21 +330,17 @@ for (v in seq(1, V)) {
     point_estimate_method = "median",
     construct_psm = TRUE
   )
-  # new_mix[[v]] <- predictFromMultipleChains(mcmc_mix[[v]], burn, construct_psm = FALSE)
 }
-
-# psms_un <- psms_semi <- psms_mix <- list()
-# K_pred_un <- K_pred_semi <- K_pred_mix <- c()
 
 results_df <- NULL
 K_pred_mdi_semi_overfit <- K_pred_mdi_semi_k_known <- K_pred_mdi_un <- K_pred_mix_overfit <- K_pred_mix_k_known <- matrix(0, n_chains, V)
 for (v in seq(1, V)) {
   for (ii in seq(1, n_chains)) {
-    .cl_mdi_un <- maxpear(mcmc_un[[ii]]$psm[[v]])$cl
-    .cl_mdi_semi_overfit <- maxpear(mcmc_semi_overfit[[ii]]$psm[[v]])$cl
-    .cl_mdi_semi_k_known <- maxpear(mcmc_semi_k_known[[ii]]$psm[[v]])$cl
-    .cl_mixture_overfit <- maxpear(mcmc_mix_overfitted[[v]][[ii]]$psm[[1]])$cl
-    .cl_mixture_k_known <- maxpear(mcmc_mix_k_known[[v]][[ii]]$psm[[1]])$cl
+    .cl_mdi_un <- mcclust.ext::minVI(mcmc_un[[ii]]$psm[[v]])$cl
+    .cl_mdi_semi_overfit <- mcclust.ext::minVI(mcmc_semi_overfit[[ii]]$psm[[v]])$cl
+    .cl_mdi_semi_k_known <- mcclust.ext::minVI(mcmc_semi_k_known[[ii]]$psm[[v]])$cl
+    .cl_mixture_overfit <- mcclust.ext::minVI(mcmc_mix_overfitted[[v]][[ii]]$psm[[1]])$cl
+    .cl_mixture_k_known <- mcclust.ext::minVI(mcmc_mix_k_known[[v]][[ii]]$psm[[1]])$cl
 
     K_pred_mdi_un[ii, v] <- .k_mdi_un <- length(unique(.cl_mdi_un))
     K_pred_mdi_semi_overfit[ii, v] <- .k_mdi_semi_overfit <- length(unique(.cl_mdi_semi_overfit))
@@ -415,100 +411,8 @@ for (v in seq(1, V)) {
     } else {
       results_df <- rbind(results_df, perf_df)
     }
-
-    # ari_semi_1 <- mcclust::arandi(new_semi$pred[[1]][test_inds], sim_cl$View_1[test_inds])
-    # ari_un_1 <- mcclust::arandi(new_un$pred[[1]][test_inds], sim_cl$View_1[test_inds])
-    # ari_mix_1 <- mcclust::arandi(new_mix[[1]]$pred[[1]][test_inds], sim_cl$View_1[test_inds])
-    #
-    # ari_semi_2 <- mcclust::arandi(new_semi$pred[[2]], sim_cl$View_2)
-    # ari_un_2 <- mcclust::arandi(new_un$pred[[2]], sim_cl$View_2)
-    # ari_mix_2 <- mcclust::arandi(new_mix[[2]]$pred[[1]], sim_cl$View_2)
-    #
-    # ari_semi_3 <- mcclust::arandi(new_semi$pred[[3]], sim_cl$View_3)
-    # ari_un_3 <- mcclust::arandi(new_un$pred[[3]], sim_cl$View_3)
-    # ari_mix_3 <- mcclust::arandi(new_mix[[3]]$pred[[1]], sim_cl$View_3)
-
-    # new_semi$pred[[v]] <- factor(.cl_semi, levels = seq(1, K_pred_semi[v]))
-    # new_un$pred[[v]] <- factor(.cl_un, levels = seq(1, K_pred_un[v]))
-    # new_mix[[v]]$pred[[1]] <- factor(.cl_mix, levels = seq(1, K_pred_mix[v]))
   }
-
-  # psms_semi[[v]] <- createSimilarityMat(new_semi$allocations[[v]])
-  # psms_un[[v]] <- createSimilarityMat(new_un$allocations[[v]])
-  # psms_mix[[v]] <- createSimilarityMat(new_mix[[v]]$allocations[[1]])
-  #
-  #
-  #
-  # .cl_semi <- mcclust::maxpear(psms_semi[[v]])$cl
-  # .cl_un <- mcclust::maxpear(psms_un[[v]])$cl
-  # .cl_mix <- mcclust::maxpear(psms_mix[[v]])$cl
-  #
-  # K_pred_semi[v] <- .k_semi <- length(unique(.cl_semi))
-  # K_pred_un[v] <- .k_un <- length(unique(.cl_un))
-  # K_pred_mix[v] <- .k_mix <- length(unique(.cl_mix))
-  #
-  # k_true <- length(unique(sim_cl[[v]]))
-  #
-  # if (.k_semi < k_true) {
-  #   K_pred_semi[v] <- k_true
-  # }
-  # if (.k_un < k_true) {
-  #   K_pred_un[v] <- k_true
-  # }
-  # if (.k_mix < k_true) {
-  #   K_pred_mix[v] <- .k_mix
-  # }
-  #
-  # new_semi$pred[[v]] <- factor(.cl_semi, levels = seq(1, K_pred_semi[v]))
-  # new_un$pred[[v]] <- factor(.cl_un, levels = seq(1, K_pred_un[v]))
-  # new_mix[[v]]$pred[[1]] <- factor(.cl_mix, levels = seq(1, K_pred_mix[v]))
 }
-
-# new_semi$psms <- psms_semi
-# new_un$psms <- psms_un
-# new_mix$psms <- psms_mix
-
-# multiClassF1(new_semi$pred[[1]], factor(sim_cl$View_1, levels = seq(1, K_pred_semi[1])))
-# multiClassF1(new_un$pred[[1]], factor(sim_cl$View_1, levels = seq(1, K_pred_un[1])))
-#
-# multiClassF1(new_semi$pred[[2]], factor(sim_cl$View_2, levels = seq(1, K_pred_semi[2])))
-# multiClassF1(new_un$pred[[2]], factor(sim_cl$View_2, levels = seq(1, K_pred_un[2])))
-#
-# multiClassF1(new_semi$pred[[3]], factor(sim_cl$View_3, levels = seq(1, K_pred_semi[3])))
-# multiClassF1(new_un$pred[[3]], factor(sim_cl$View_3, levels = seq(1, K_pred_un[3])))
-#
-# cat("\nCompare to truth using the adjusted rand index.")
-#
-# ari_semi_1 <- mcclust::arandi(new_semi$pred[[1]][test_inds], sim_cl$View_1[test_inds])
-# ari_un_1 <- mcclust::arandi(new_un$pred[[1]][test_inds], sim_cl$View_1[test_inds])
-# ari_mix_1 <- mcclust::arandi(new_mix[[1]]$pred[[1]][test_inds], sim_cl$View_1[test_inds])
-#
-# ari_semi_2 <- mcclust::arandi(new_semi$pred[[2]], sim_cl$View_2)
-# ari_un_2 <- mcclust::arandi(new_un$pred[[2]], sim_cl$View_2)
-# ari_mix_2 <- mcclust::arandi(new_mix[[2]]$pred[[1]], sim_cl$View_2)
-#
-# ari_semi_3 <- mcclust::arandi(new_semi$pred[[3]], sim_cl$View_3)
-# ari_un_3 <- mcclust::arandi(new_un$pred[[3]], sim_cl$View_3)
-# ari_mix_3 <- mcclust::arandi(new_mix[[3]]$pred[[1]], sim_cl$View_3)
-#
-# results_df <- data.frame(
-#   "Scenario" = rep(scn, V),
-#   "Index" = rep(index, V),
-#   "View" = seq(1, V),
-#   "Semi-supservised" = c(ari_semi_1, ari_semi_2, ari_semi_3),
-#   "Unsupservised" = c(ari_un_1, ari_un_2, ari_un_3),
-#   "Mixture_model" = c(ari_mix_1, ari_mix_2, ari_mix_3),
-#   "Difference_unsupervised" = c(
-#     ari_semi_1 - ari_un_1,
-#     ari_semi_2 - ari_un_2,
-#     ari_semi_3 - ari_un_3
-#   ),
-#   "Difference_mixture_model" = c(
-#     ari_semi_1 - ari_mix_1,
-#     ari_semi_2 - ari_mix_2,
-#     ari_semi_3 - ari_mix_3
-#   )
-# )
 
 cat("\nSave results\n.")
 knitr::kable(results_df, digits = 3)
@@ -520,9 +424,6 @@ out_lst <- list(
     "MDI_semisupervised_k_known" = mcmc_semi_k_known,
     "Mixture_model_overfitted" = mcmc_mix_overfitted,
     "Mixture_model_k_known" = mcmc_mix_k_known
-    # "Semisupservised" = new_semi,
-    # "Unsupservised" = new_un,
-    # "Mixture_model" = new_mix
   ),
   "ARI" = results_df
 )

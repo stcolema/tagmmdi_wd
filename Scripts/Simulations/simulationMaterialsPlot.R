@@ -9,6 +9,7 @@ suppressMessages(library(magrittr))
 suppressMessages(library(dplyr))
 
 mdiHelpR::setMyTheme()
+
 prepDataForggHeatmap <- function(X, row_order = NULL, col_order = NULL) {
   N <- nrow(X)
   P <- ncol(X)
@@ -73,9 +74,9 @@ for (ii in seq(1, n_scn)) {
   # for (jj in seq(1, n_files)) {
   f_in <- input_files[jj]
   x <- readRDS(f_in)
-
+  
   row_order <- findOrder(x$Data$View_1)
-
+  
   view_1_gg_df <- x$Data$View_1 |>
     prepDataForggHeatmap(row_order = row_order) |>
     mutate(View = 1)
@@ -85,19 +86,19 @@ for (ii in seq(1, n_scn)) {
   view_3_gg_df <- x$Data$View_3 |>
     prepDataForggHeatmap(row_order = NULL) |>
     mutate(View = 3)
-
+  
   gg_df <- rbind(view_1_gg_df, view_2_gg_df, view_3_gg_df)
   gg_df$View <- factor(gg_df$View)
   gg_df$Scenario <- scn
-
+  
   labels <- do.call(cbind, x$Clustering)
-
+  
   labels_gg_df <- labels |>
     prepDataForggHeatmap(row_order = row_order, col_order = c(1, 2, 3)) |>
     mutate(View = "Labels")
-
+  
   labels_gg_df$Scenario <- scn
-
+  
   if (ii == 1) {
     big_gg_df <- gg_df
     big_labels_gg_df <- labels_gg_df
@@ -141,5 +142,43 @@ p_gg <- p_labels + p_data +
   plot_layout(widths = c(1, 6), guides = "collect")
 # plot_annotation(title = gg_title)
 
-ggsave("./Plots/SimData/Data/Simulation1AllScenarios.png", p_gg, height = 6, width = 8)
-ggsave("./Plots/SimData/Data/Simulation1AllScenarios.pdf", p_gg, height = 6, width = 8, device = "pdf")
+
+data_dir <- "./Simulations/Data/"
+scenarios <- list.dirs(data_dir, recursive = FALSE, full.names = FALSE)
+n_scn <- length(scenarios)
+for (ii in seq(1, n_scn)) {
+  scn <- scenarios[ii]
+  scn_input_dir <- paste0(data_dir, scn)
+  input_files <- list.files(scn_input_dir, pattern = "*.rds", full.names = TRUE) |>
+    stringr::str_sort(numeric = TRUE)
+  n_files <- length(input_files)
+  for (jj in seq(1, n_files)) {
+    f_in <- input_files[jj]
+    x <- readRDS(f_in)
+    ari_12 <- mcclust::arandi(x$Clustering$View_1, x$Clustering$View_2)
+    ari_13 <- mcclust::arandi(x$Clustering$View_1, x$Clustering$View_3)
+    ari_23 <- mcclust::arandi(x$Clustering$View_2, x$Clustering$View_3)
+    
+    .entry <- data.frame("ARI_12" = ari_12, "ARI_13" = ari_13, "ARI_23" = ari_23, Scenario = scn)
+    if ((ii == 1) & (jj == 1)) {
+      ari_df <- .entry
+    } else {
+      ari_df <- rbind(ari_df, .entry)
+    }
+  }
+}
+
+long_ari_df <- ari_df |>
+  pivot_longer(-Scenario, names_to = "Views", values_to = "ARI")
+
+long_ari_df$Views <- factor(long_ari_df$Views, labels = c("(1, 2)", "(1, 3)", "(2, 3)"))
+long_ari_df$Datasets <- long_ari_df$Views
+
+
+p_view_comp <- long_ari_df |>
+  ggplot(aes(x = Datasets, y = ARI, fill = Datasets)) +
+  geom_boxplot() +
+  ggthemes::scale_fill_colorblind() +
+  ylim(c(0, 1))
+
+p_view_comp + p_gg + plot_annotation(tag_levels = "A")

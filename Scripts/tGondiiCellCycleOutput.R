@@ -158,7 +158,7 @@ allocations <- predictions$allocations[[1]]
 
 rm(mcmc_output, predictions)
 psm <- mdiHelpR::createSimilarityMat(allocations)
-mm_predicted <- mcclust::maxpear(psm, max.k = 100)
+mm_predicted <- mcclust.ext::minVI(psm, max.k = 100)
 mvn_predicted_clustering <- mm_predicted$cl
 # pheatmap(psm)
 
@@ -196,7 +196,7 @@ fused_genes <- readRDS("./fusedGenes.rds")
 
 
 mdi_psm <- mdiHelpR::createSimilarityMat(mdi_output$allocations[[1]])
-mdi_predicted <- mcclust::maxpear(mdi_psm, max.k = 100)
+mdi_predicted <- mcclust.ext::minVI(mdi_psm, max.k = 100)
 mdi_predicted_clustering <- mdi_predicted$cl
 
 # This data frame will hold the LOPIT data and additional data

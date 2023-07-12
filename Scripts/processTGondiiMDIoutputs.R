@@ -574,7 +574,7 @@ cat("\n# === Investigate cell cycle data =======================================
 microarray_data |> pheatmap::pheatmap(show_colnames = FALSE, show_rownames = FALSE, cluster_cols = FALSE)
 
 cell_cycle_psm <- predictions$allocations[[1]] |> makePSM()
-cell_cycle_pred <- mcclust::maxpear(cell_cycle_psm, max.k = 125)
+cell_cycle_pred <- mcclust.ext::minVI(cell_cycle_psm, max.k = 125)
 
 cell_cycle_psm_1 <- mcmc_output[[1]]$allocations[, , 1] |> makePSM()
 cell_cycle_psm_2 <- mcmc_output[[2]]$allocations[, , 1] |> makePSM()
@@ -583,9 +583,9 @@ cell_cycle_psm_3 <- mcmc_output[[3]]$allocations[, , 1] |> makePSM()
 point_estimate <- predictions$pred
 point_estimate[[1]] <- cell_cycle_pred$cl
 
-cell_cycle_pred_1 <- mcclust::maxpear(cell_cycle_psm_1, max.k = 30)$cl
-cell_cycle_pred_2 <- mcclust::maxpear(cell_cycle_psm_2, max.k = 30)$cl
-cell_cycle_pred_3 <- mcclust::maxpear(cell_cycle_psm_3, max.k = 30)$cl
+cell_cycle_pred_1 <- mcclust.ext::minVI(cell_cycle_psm_1, max.k = 30)$cl
+cell_cycle_pred_2 <- mcclust.ext::minVI(cell_cycle_psm_2, max.k = 30)$cl
+cell_cycle_pred_3 <- mcclust.ext::minVI(cell_cycle_psm_3, max.k = 30)$cl
 
 used_inds1 <- which(cell_cycle_pred_1 < 7)
 used_inds2 <- which(cell_cycle_pred_2 < 8)

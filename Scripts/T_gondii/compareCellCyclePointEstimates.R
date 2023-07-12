@@ -8,32 +8,14 @@ library(magrittr)
 mdiHelpR::setMyTheme()
 
 mdi_obj <- readRDS("./T_gondii/ConsensusClustering/CC_R_15000_K_125_full.rds")
-# maxpear_cl <- mcclust::maxpear(salso_obj$cm[[2]])
-#
-# salso_obj$cell_cycle_predictions <- list()
-#
-# mdi_obj$cell_cycle_predictions$salso <- salso_obj$pred[[2]]
-# mdi_obj$cell_cycle_predictions$maxpear <- maxpear_cl$cl
-# mdi_salso <- salso::salso(salso_obj$allocations[[2]], maxNClusters = 500, maxZealousAttempts = 750, nCores = 3)
-#
-# saveRDS(mdi_obj, "./T_gondii/ConsensusClustering/CC_R_15000_K_125_full.rds")
-
 mix_obj <- readRDS("./T_gondii/ConsensusClustering/CC_R_15000_K_300_cell_cycle_mix.rds")
-
-# mix_salso <- salso::salso(mix_mod$allocations[[1]], maxNClusters = 500, maxZealousAttempts = 750, nCores = 3)
-# mix_maxpear <- mcclust::maxpear(mix_mod$cm[[1]])$cl
-# mix_obj$cell_cycle_predictions <- list()
-# mix_obj$cell_cycle_predictions$salso <- mix_salso
-# mix_obj$cell_cycle_predictions$maxpear <- mix_maxpear
-#
-# saveRDS(mix_obj, "./T_gondii/ConsensusClustering/CC_R_15000_K_300_cell_cycle_mix.rds")
 
 
 mdi_salso <- mdi_obj$cell_cycle_predictions$salso
-mdi_maxpear <- mdi_obj$cell_cycle_predictions$maxpear
+mdi_vi <- mdi_obj$cell_cycle_predictions$vi
 
 mix_salso <- mix_obj$cell_cycle_predictions$salso
-mix_maxpear <- mix_obj$cell_cycle_predictions$maxpear
+mix_vi <- mix_obj$cell_cycle_predictions$vi
 
 # === Input data ===============================================================
 
@@ -59,29 +41,29 @@ label_to_organelle <- data.frame(
 
 marker_inds <- which(tagm_comparison$markers != "unknown")
 marker_proteins <- tagm_comparison$markers[marker_inds]
-maxpear_predictions <- mdi_maxpear[marker_inds]
+vi_predictions <- mdi_vi[marker_inds]
 salso_predictions <- mdi_salso[marker_inds]
 
-mcclust::arandi(marker_proteins, maxpear_predictions)
+mcclust::arandi(marker_proteins, vi_predictions)
 mcclust::arandi(marker_proteins, salso_predictions)
-mcclust::arandi(maxpear_predictions, salso_predictions)
-mcclust::arandi(mdi_maxpear, mdi_salso)
-mcclust::arandi(mdi_maxpear, mix_maxpear)
+mcclust::arandi(vi_predictions, salso_predictions)
+mcclust::arandi(mdi_vi, mdi_salso)
+mcclust::arandi(mdi_vi, mix_vi)
 mcclust::arandi(mdi_salso, mix_salso)
 
-maxpear_df <- as.data.frame(table(mdi_maxpear))
+vi_df <- as.data.frame(table(mdi_vi))
 salso_df <- as.data.frame(table(mdi_salso))
 
-mix_maxpear_df <- as.data.frame(table(mix_maxpear))
+mix_vi_df <- as.data.frame(table(mix_vi))
 mix_salso_df <- as.data.frame(table(mix_salso))
 
-mix_maxpear_df$Method <- maxpear_df$Method <- "maxpear"
+mix_vi_df$Method <- vi_df$Method <- "vi"
 mix_salso_df$Method <- salso_df$Method <- "salso"
 
-salso_df$Model <- maxpear_df$Model <- "MDI"
-mix_salso_df$Model <- mix_maxpear_df$Model <- "Mixture model"
+salso_df$Model <- vi_df$Model <- "MDI"
+mix_salso_df$Model <- mix_vi_df$Model <- "Mixture model"
 
-comp_df <- rbind(maxpear_df[, -1], salso_df[, -1], mix_maxpear_df[, -1], mix_salso_df[, -1])
+comp_df <- rbind(vi_df[, -1], salso_df[, -1], mix_vi_df[, -1], mix_salso_df[, -1])
 
 comp_df |>
   ggplot(aes(x = Method, y = Freq, fill = Model)) +
@@ -89,7 +71,7 @@ comp_df |>
   labs(y = "Number of members in a cluster") +
   ggthemes::scale_fill_colorblind()
 
-ggsave("./T_gondii/Analysis/ComparisonSALSOMAXPEARMembership.png")
+ggsave("./T_gondii/Analysis/ComparisonSALSOVIMembership.png")
 
 p_occ_mdi <- (1 * (mdi_obj$N_k[[2]] != 0)) |>
   pheatmap(cluster_cols = TRUE, cluster_rows = FALSE, main = "MDI", color = simColPal())
@@ -103,8 +85,8 @@ rowSums((1 * (mdi_obj$N_k[[2]] != 0))) |> mean()
 rowSums((1 * (mix_obj$N_k[[1]] != 0))) |> mean()
 
 table
-mdi_pred <- mdi_maxpear
-mix_pred <- mix_maxpear
+mdi_pred <- mdi_vi
+mix_pred <- mix_vi
 
 cl_14 <- which(mdi_pred == 20)
 

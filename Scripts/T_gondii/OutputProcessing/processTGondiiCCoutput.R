@@ -370,7 +370,7 @@ for (ii in seq(1, number_chains)) {
 
       if (v != lopit_ind) {
         # predicted_partitions[[v]][[curr_cm_index]] <- salso::salso(matrix(allocations[[jj]][chains_used, , v], ncol = N))
-        predicted_partitions[[v]][[curr_cm_index]] <- mcclust::maxpear(.cm)$cl
+        predicted_partitions[[v]][[curr_cm_index]] <- mcclust.ext::minVI(.cm)$cl
       } else {
         .alloc_prob <- ccCalcAllocProbs(allocation_probs[[jj]], view = lopit_ind)
         classification_probability[[curr_cm_index]] <- apply(.alloc_prob, 1, max)
