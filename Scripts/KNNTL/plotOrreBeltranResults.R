@@ -6,6 +6,8 @@ library(dplyr)
 library(ggthemes)
 library(patchwork)
 
+mdiHelpR::setMyTheme()
+
 devices <- c("pdf")
 save_dir <- "./Plots/ValidationModernData/"
 
@@ -44,20 +46,32 @@ beltran_df$Modality <- factor(beltran_df$Modality,
 col_pal <- ggthemes::colorblind_pal()(4)[c(2, 3)]
 names(col_pal) <- c("MDI", "TAGM")
 
+
+dummy_df <- beltran_df[1:4, ]
+dummy_df[1:3, 4] <- 1.0
+dummy_df[4, 4] <- 0.0
+
 p_beltran <- beltran_df |>
   dplyr::filter(Score %in% c("Accuracy", "Macro F1", "Brier loss")) |>
   ggplot(aes(y = Value, x = Model, fill = Model)) +
   geom_boxplot() +
+  geom_blank(data = dummy_df[-3, ]) +
   facet_grid(Score ~ Modality, scales = "free") + # , nrow = 1) +
-  scale_fill_manual(values = col_pal)
+  scale_fill_manual(values = col_pal) + 
+  scale_y_continuous(breaks = scales::breaks_width(0.05))
 
+dummy_df <- orre_df[1:4, ]
+dummy_df[1:3, 4] <- 1.0
+dummy_df[4, 4] <- 0.0
 
 p_orre <- orre_df |>
   dplyr::filter(Score %in% c("Accuracy", "Macro F1", "Brier loss")) |>
   ggplot(aes(y = Value, x = Model, fill = Model)) +
   geom_boxplot() +
+  geom_blank(data = dummy_df[-3, ]) +
   facet_grid(Score ~ Modality, scales = "free") + # , nrow = 1) +
-  scale_fill_manual(values = col_pal)
+  scale_fill_manual(values = col_pal) + 
+  scale_y_continuous(breaks = scales::breaks_width(0.1))
 
 p_patch <- p_beltran / p_orre +
   patchwork::plot_layout(guides = "collect") +

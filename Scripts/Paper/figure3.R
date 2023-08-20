@@ -293,7 +293,7 @@ ggPheatmap <- function(X, markers, col_pal, include_dendogram = TRUE) {
     scale_fill_manual(values = col_pal)
 
   # Order data based on clusters and sample types
-  coexpression_mat <- MDIr::prepDataForggHeatmap(X, row_order = row_order, col_order = FALSE)
+  coexpression_mat <- mdir::prepDataForggHeatmap(X, row_order = row_order, col_order = FALSE)
   coexpression_mat$Type <- "Coexpression"
   coexpression_mat$Feature <- factor(coexpression_mat$Feature,
     levels = levels(coexpression_mat$Feature),
@@ -531,18 +531,53 @@ marker_labels <- c(
 markers <- factor(markers, levels = marker_levels, labels = marker_labels)
 plot_df <- data.frame("tSNE_1" = my_tsne$Y[, 1], "tSNE_2" = my_tsne$Y[, 2], organelle = markers)
 
-col_pal <- c(pals::alphabet(), "#808080")
+
+col_pal <- c(
+  "#a7bed3",
+  "#adf7b6",
+  "#c6e2e9",
+  "#f1ffc4",
+  "#ffcaaf",
+  "#dab894",
+  "#70d6ff",
+  "#ff70a6",
+  "#ff9770",
+  "#ffd670",
+  "#e9ff70",
+  "#f08080",
+  "#fbc4ab",
+  "#dfb2f4",
+  "#f5e960",
+  "#f5e5f0",
+  "#55d6c2",
+  "#ffffff",
+  "#84dcc6",
+  "#a5ffd6",
+  "#79addc",
+  "#ffc09f",
+  "#ffee93",
+  "#fcf5c7",
+  "#ffa69e",
+  "#ff686b",
+  "#808080"
+)
+
+# col_pal <- c(pals::alphabet(), "#808080")
 names(col_pal) <- marker_labels # c(names(pals::alphabet()), "grey50")
 
-plot_df$Alpha <- 0.6 * (plot_df$organelle != "all other proteins") + 0.3 * (plot_df$organelle == "all other proteins")
+plot_df$Alpha <- 0.8 * (plot_df$organelle != "all other proteins") + 0.6 * (plot_df$organelle == "all other proteins")
 p_tsne <- plot_df |>
-  ggplot(aes(x = tSNE_1, y = tSNE_2, color = organelle)) +
-  geom_point(aes(alpha = Alpha)) +
-  labs(x = "tSNE 1", y = "tSNE 2", color = "Markers") +
+  ggplot(aes(x = tSNE_1, y = tSNE_2, fill = organelle), color = "#808080", ) +
+  geom_point(aes(alpha = Alpha), shape = 21, size = 2.25) +
+  labs(x = "tSNE 1", y = "tSNE 2", fill = "Markers") +
   theme(legend.position = "bottom") +
-  scale_color_manual(values = col_pal) +
+  scale_fill_manual(values = col_pal) +
   guides(color = guide_legend(ncol = 4)) +
-  scale_alpha(guide = 'none')
+  scale_alpha(guide = "none") +
+  theme(
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank()
+  )
 
 microarray_mat <- as.matrix(microarray_data)
 # colnames(microarray_mat) <- paste0("Hour ", seq(0, 12))
@@ -557,8 +592,8 @@ behnke_cell_cycle_diagram_filename <- "/home/stephen/Documents/TAGM_MDI_paper/Fi
 behnke_cell_cycle_diagram <- readPNG(behnke_cell_cycle_diagram_filename)
 
 design <- "
- A#B#
- ACCC
+ A##BBB
+ A#CCC#
 "
 
 p_patch <- (p_tsne
@@ -568,14 +603,30 @@ p_patch <- (p_tsne
   + grid::rasterGrob(behnke_cell_cycle_diagram)
 ) + plot_layout(
   design = design,
-  widths = c(1.25, 0.175, 1.0, 0.07),
+  widths = c(1.25, 0.1, 0.04, 1.0, 0.2, 0.0005),
   heights = c(1.0, 1.0)
 ) + plot_annotation(tag_levels = "A")
 
 
-ggsave("Plots/Fig3/fig3CaseTGondiiData.pdf", plot = p_patch, height = 9.0, width = 16.0)
-ggsave("Plots/Fig3/fig3ACaseTGondiiDatatSNE.pdf", plot = p_tsne, height = 9.0, width = 8.0)
-ggsave("Plots/Fig3/fig3BCaseTGondiiDataGE.pdf", plot = p_ge, height = 9.0, width = 8.0)
+ggsave("Plots/Fig3/Fig3TGondiiData.pdf",
+  plot = p_patch,
+  device = "pdf",
+  height = 12.0,
+  width = 16.0
+)
+
+ggsave("Plots/Fig3/fig3ACaseTGondiiDatatSNE.pdf",
+  plot = p_tsne,
+  device = "pdf",
+  height = 12.0,
+  width = 8.0
+)
+ggsave("Plots/Fig3/fig3BCaseTGondiiDataGE.pdf",
+  plot = p_ge,
+  device = "pdf",
+  height = 9.0,
+  width = 8.0
+)
 # lopit_data |>
 #   dplyr::mutate(Organelle = markers) |>
 #   dplyr::filter(Fixed == 1) |>

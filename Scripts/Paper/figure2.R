@@ -1,4 +1,3 @@
-
 suppressMessages(library(pRolocdata))
 suppressMessages(library(pRoloc))
 suppressMessages(library(ggplot2))
@@ -13,6 +12,37 @@ suppressMessages(library(optparse))
 
 setMyTheme()
 sim_col_pal <- simColPal()
+
+col_pal <- c(
+  "#a7bed3",
+  "#adf7b6",
+  "#c6e2e9",
+  "#f1ffc4",
+  "#ffcaaf",
+  "#dab894",
+  "#70d6ff",
+  "#ff70a6",
+  "#ff9770",
+  "#ffd670",
+  "#e9ff70",
+  "#f08080",
+  "#fbc4ab",
+  "#dfb2f4",
+  "#f5e960",
+  "#f5e5f0",
+  "#55d6c2",
+  "#ffffff",
+  "#84dcc6",
+  "#a5ffd6",
+  "#79addc",
+  "#ffc09f",
+  "#ffee93",
+  "#fcf5c7",
+  "#ffa69e",
+  "#ff686b",
+  "#808080"
+)
+
 
 data("HEK293T2011")
 data("groen2014r1")
@@ -123,8 +153,8 @@ p_performance <- long_result_df %>%
   ggplot(aes(x = Model, y = Value)) +
   geom_boxplot(aes(fill = Model)) +
   facet_grid(Score ~ Dataset, scales = "free") +
-  scale_fill_manual(values = my_palette) + 
-  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) # +
+  scale_fill_manual(values = my_palette) +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)) # +
 # theme(legend.position = "bottom")
 
 # write.csv(result_df, file = result_csv_file)
@@ -141,10 +171,32 @@ human_pcs <- prcomp(human_lopit, center = TRUE, scale. = TRUE)
 human_df <- as.data.frame(human_pcs$x[, c(1, 2)]) |>
   mutate(Marker = human_marker_proteins_df$markers, Dataset = "Human")
 
+human_col_pal <- c(
+  "#a7bed3",
+  "#70d6ff",
+  "#c6e2e9",
+  "#ff9770",
+  "#dfb2f4",
+  "#f5e960",
+  "#ffffff",
+  "#79addc",
+  "#fcf5c7",
+  "#ffa69e",
+  "#ff686b",
+  "#808080"
+)
+
+names(human_col_pal) <- levels(human_df$Marker)
+
 p_human <- human_df |>
-  ggplot(aes(x = PC1, y = PC2, color = Marker)) +
-  geom_point(alpha = 0.3) +
-  facet_wrap(~Dataset)
+  ggplot(aes(x = PC1, y = PC2)) +
+  geom_point(aes(fill = Marker), color = "#808080", shape = 21) +
+  facet_wrap(~Dataset) +
+  scale_fill_manual(values = human_col_pal) +
+  theme(
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank()
+  )
 
 # === Root dataset =============================================================
 
@@ -157,10 +209,27 @@ root_pcs <- prcomp(root_lopit, center = TRUE, scale. = TRUE)
 root_df <- as.data.frame(root_pcs$x[, c(1, 2)]) |>
   mutate(Marker = root_marker_proteins_df$markers, Dataset = "Root")
 
+
+root_col_pal <- c(
+  "#c6e2e9",
+  "#f5e960",
+  "#ffffff",
+  "#79addc",
+  "#ff686b",
+  "#808080"
+)
+
+names(root_col_pal) <- levels(root_df$Marker)
+
 p_root <- root_df |>
-  ggplot(aes(x = PC1, y = PC2, color = Marker)) +
-  geom_point(alpha = 0.3) +
-  facet_wrap(~Dataset)
+  ggplot(aes(x = PC1, y = PC2)) +
+  geom_point(aes(fill = Marker), color = "#808080", shape = 21) +
+  facet_wrap(~Dataset) +
+  scale_fill_manual(values = root_col_pal) +
+  theme(
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank()
+  )
 
 # === Callus dataset ===========================================================
 
@@ -173,10 +242,30 @@ callus_pcs <- prcomp(callus_lopit, center = TRUE, scale. = TRUE)
 callus_df <- as.data.frame(callus_pcs$x[, c(1, 2)]) |>
   mutate(Marker = callus_marker_proteins_df$markers, Dataset = "Callus")
 
+
+callus_col_pal <- c(
+  "#70d6ff",
+  "#c6e2e9",
+  "#ff9770",
+  "#f5e960",
+  "#ffffff",
+  "#79addc",
+  "#fcf5c7",
+  "#ff686b",
+  "#808080"
+)
+
+names(callus_col_pal) <- levels(callus_df$Marker)
+
 p_callus <- callus_df |>
-  ggplot(aes(x = PC1, y = PC2, color = Marker)) +
-  geom_point(alpha = 0.3) +
-  facet_wrap(~Dataset)
+  ggplot(aes(x = PC1, y = PC2)) +
+  geom_point(aes(fill = Marker), color = "#808080", shape = 21) +
+  facet_wrap(~Dataset) +
+  scale_fill_manual(values = callus_col_pal) +
+  theme(
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank()
+  )
 
 # === Mouse dataset ============================================================
 
@@ -189,10 +278,32 @@ mouse_pcs <- prcomp(mouse_lopit, center = TRUE, scale. = TRUE)
 mouse_df <- as.data.frame(mouse_pcs$x[, c(1, 2)]) |>
   mutate(Marker = mouse_marker_proteins_df$markers, Dataset = "Mouse")
 
+mouse_col_pal <- c(
+  "#a7bed3",
+  "#70d6ff",
+  "#ff9770",
+  "#dfb2f4",
+  "#f5e960",
+  "#ffffff",
+  "#79addc",
+  "#fcf5c7",
+  "#ffa69e",
+  "#ff686b",
+  "#808080"
+)
+
+names(mouse_col_pal) <- levels(mouse_df$Marker)
+
+
 p_mouse <- mouse_df |>
-  ggplot(aes(x = PC1, y = PC2, color = Marker)) +
-  geom_point(alpha = 0.3) +
-  facet_wrap(~Dataset)
+  ggplot(aes(x = PC1, y = PC2)) +
+  geom_point(aes(fill = Marker), color = "#808080", shape = 21) +
+  facet_wrap(~Dataset) +
+  scale_fill_manual(values = mouse_col_pal) +
+  theme(
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank()
+  )
 
 # === Visualisation ============================================================
 
@@ -209,19 +320,71 @@ p_data_alt <- (p_callus + p_root) / (p_human + p_mouse) +
   theme(legend.position = "bottom")
 
 layout <- c("
-  AABBEEE
-  CCDDEEE"
-)
+  AB
+  AB
+  CD
+  CD
+  EE
+  EE
+  EE
+")
+
+data_layout <- c("
+  AB
+  CD
+")
+
+p_data <-  p_callus + p_root + p_human + p_mouse +
+  plot_annotation(tag_levels = "A") +
+  plot_layout(design = data_layout) 
 
 p_final <- p_callus + p_root + p_human + p_mouse + p_performance +
-  plot_annotation(tag_levels = "A") + 
+  plot_annotation(tag_levels = "A") +
   plot_layout(design = layout) +
   theme(legend.position = "bottom")
 
-ggsave("Plots/fig2ValidationStudy.png", plot = p_final, height = 9.0, width = 16.0)
+ggsave("Plots/fig2ValidationStudy.pdf",
+  plot = p_final,
+  device = "pdf",
+  height = 18.0,
+  width = 12.0
+)
 
-ggsave("Plots/Fig2/fig2ACallus.pdf", plot = p_callus, height = 4.5, width = 6.0)
-ggsave("Plots/Fig2/fig2BRoot.pdf", plot = p_root, height = 4.5, width = 6.0)
-ggsave("Plots/Fig2/fig2CHuman.pdf", plot = p_human, height = 4.5, width = 6.0)
-ggsave("Plots/Fig2/fig2DMouse.pdf", plot = p_mouse, height = 4.5, width = 6.0)
-ggsave("Plots/Fig2/fig2EPerformance.pdf", plot = p_performance, height = 9.0, width = 8.0)
+ggsave("Plots/Fig2/fig2ValidationStudyData.pdf",
+  plot = p_data,
+  device = "pdf",
+  height = 10.0,
+  width = 12.0
+)
+
+
+ggsave("Plots/Fig2/fig2ACallus.pdf",
+  plot = p_callus,
+  device = "pdf",
+  height = 4.5,
+  width = 6.0
+)
+ggsave("Plots/Fig2/fig2BRoot.pdf",
+  plot = p_root,
+  device = "pdf",
+  height = 4.5,
+  width = 6.0
+)
+ggsave("Plots/Fig2/fig2CHuman.pdf",
+  plot = p_human,
+  device = "pdf",
+  height = 4.5,
+  width = 6.0
+)
+ggsave("Plots/Fig2/fig2DMouse.pdf",
+  plot = p_mouse,
+  device = "pdf",
+  height = 4.5,
+  width = 6.0
+)
+ggsave("Plots/Fig2/fig2EPerformance.pdf",
+  plot = p_performance,
+  device = "pdf",
+  height = 9.0,
+  width = 8.0
+)

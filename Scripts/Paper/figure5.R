@@ -19,6 +19,36 @@ suppressMessages(library(pheatmap))
 suppressMessages(library(patchwork))
 suppressMessages(library(ggforce))
 
+col_pal <- c(
+  "#a7bed3",
+  "#adf7b6",
+  "#c6e2e9",
+  "#f1ffc4",
+  "#ffcaaf",
+  "#dab894",
+  "#70d6ff",
+  "#ff70a6",
+  "#ff9770",
+  "#ffd670",
+  "#e9ff70",
+  "#f08080",
+  "#fbc4ab",
+  "#dfb2f4",
+  "#f5e960",
+  "#f5e5f0",
+  "#55d6c2",
+  "#ffffff",
+  "#84dcc6",
+  "#a5ffd6",
+  "#79addc",
+  "#ffc09f",
+  "#ffee93",
+  "#fcf5c7",
+  "#ffa69e",
+  "#ff686b",
+  "#808080"
+)
+
 # User inputs from command line
 input_arguments <- function() {
   option_list <- list(
@@ -297,7 +327,7 @@ ggPheatmap <- function(X, markers, col_pal, row_order = NULL, include_dendogram 
     scale_fill_manual(values = rel_col_pal)
 
   # Order data based on clusters and sample types
-  coexpression_mat <- MDIr::prepDataForggHeatmap(X, row_order = row_order, col_order = FALSE)
+  coexpression_mat <- mdir::prepDataForggHeatmap(X, row_order = row_order, col_order = FALSE)
   coexpression_mat$Type <- "Coexpression"
   coexpression_mat$Feature <- factor(coexpression_mat$Feature,
     levels = levels(coexpression_mat$Feature),
@@ -581,7 +611,7 @@ plot_df <- data.frame(
   mutate(Marker_protein = markers != "all other proteins")
 row.names(plot_df) <- row.names(tagm_comparison)
 
-col_pal <- c(pals::alphabet())
+# col_pal <- c(pals::alphabet())
 names(col_pal) <- marker_labels[-27] # c(names(pals::alphabet()), "grey50")
 
 
@@ -636,36 +666,127 @@ dg_proteins <- row.names(plot_df)[dg_subset]
 dg_gene_expression_data <- microarray_mat[dg_proteins, ]
 dg_predictions <- predicted_localisation[dg_subset]
 
+
+
 p_tsne <- plot_df |>
-  ggplot(aes(x = tSNE_1, y = tSNE_2, color = predicted_localisation)) +
-  geom_point(alpha = 0.8) +
-  labs(x = "tSNE 1", y = "tSNE 2", color = "Markers") +
+  ggplot(aes(x = tSNE_1, y = tSNE_2)) +
+  geom_point(aes(fill = predicted_localisation),
+    color = "#808080",
+    shape = 21,
+    size = 2.25,
+    alpha = 0.8
+  ) +
+  labs(x = "tSNE 1", y = "tSNE 2", fill = "Localisation") +
   theme(legend.position = "bottom") +
-  scale_color_manual(values = col_pal) +
-  guides(color = guide_legend(ncol = 4)) # +
-  # facet_zoom(xy = predicted_localisation %in% dense_granule_organelle)
+  scale_fill_manual(values = col_pal, drop = FALSE) +
+  guides(fill = guide_legend(ncol = 4)) +
+  scale_alpha(guide = "none") +
+  theme(
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank()
+  )
+#
+#   ggplot(aes(x = tSNE_1, y = tSNE_2, color = predicted_localisation)) +
+#   geom_point(alpha = 0.8) +
+#   labs(x = "tSNE 1", y = "tSNE 2", color = "Markers") +
+#   theme(legend.position = "bottom") +
+#   scale_color_manual(values = col_pal) +
+#   guides(color = guide_legend(ncol = 4)) # +
+#   # facet_zoom(xy = predicted_localisation %in% dense_granule_organelle)
+
+col_pal2 <- col_pal[c(6, 27)]
+names(col_pal2) <- c("Yes", "No")
 
 p_tsne_dg <- plot_df |>
-  ggplot(aes(x = tSNE_1, y = tSNE_2, color = predicted_localisation)) +
-  geom_point(alpha = 0.8) +
-  labs(x = "tSNE 1", y = "tSNE 2", color = "Markers") +
+  mutate("Shape" = ifelse(predicted_localisation == "dense granules", "Yes", "No")) |> 
+  # ggplot(aes(x = tSNE_1, y = tSNE_2, color = predicted_localisation)) +
+  ggplot(aes(x = tSNE_1, y = tSNE_2)) +
+  geom_point(aes(fill = Shape, shape = Shape),
+    color = "#808080",
+    # shape = 21,
+    size = 2.25,
+    # alpha = 0.6
+  ) +
+  labs(x = "tSNE 1",
+       y = "tSNE 2", 
+       fill = "Dense granule protein",
+       shape = "Dense granule protein") +
   theme(legend.position = "bottom") +
-  scale_color_manual(values = col_pal) +
-  guides(color = guide_legend(ncol = 4)) +
-  coord_cartesian(xlim = c(-0, 20), ylim = c(-12, 17.5)) 
+  scale_fill_manual(values = col_pal2, drop = FALSE) +
+  # guides(fill = guide_legend(ncol = 4)) +
+  # scale_alpha(guide = "none") +
+  theme(
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank()
+  ) +
+  coord_cartesian(xlim = c(-0, 20), ylim = c(-12, 17.5)) +
+  scale_shape_manual(values = c(21, 23))
 # facet_zoom(xy = predicted_localisation %in% dense_granule_organelle)
 
 p_tsne_dg2 <- plot_df |>
-  mutate(GE_cluster = factor(pred_cl[[2]])) |> 
-  filter(predicted_localisation == "dense granules") |> 
-  ggplot(aes(x = tSNE_1, y = tSNE_2, color = GE_cluster)) +
-  geom_point(alpha = 0.8) +
-  labs(x = "tSNE 1", y = "tSNE 2", color = "Markers") +
+  mutate(GE_cluster = factor(pred_cl[[2]])) |>
+  filter(predicted_localisation == "dense granules") |>
+  ggplot(aes(x = tSNE_1, y = tSNE_2)) +
+  geom_point(aes(fill = GE_cluster),
+    color = "#808080",
+    shape = 21,
+    size = 2.25
+    # alpha = 0.8
+  ) +
+  labs(x = "tSNE 1", y = "tSNE 2", fill = "Localisation") +
   theme(legend.position = "bottom") +
-  scale_color_manual(values = col_pal) +
+  scale_fill_manual(values = col_pal, drop = FALSE) +
   guides(color = guide_legend(ncol = 4)) +
-  coord_cartesian(xlim = c(-0, 20), ylim = c(-12, 17.5)) 
+  scale_alpha(guide = "none") +
+  theme(
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank()
+  ) +
+  # ggplot(aes(x = tSNE_1, y = tSNE_2, color = GE_cluster)) +
+  # geom_point(alpha = 0.8) +
+  # labs(x = "tSNE 1", y = "tSNE 2", color = "Markers") +
+  # theme(legend.position = "bottom") +
+  # scale_color_manual(values = col_pal) +
+  # guides(color = guide_legend(ncol = 4)) +
+  coord_cartesian(xlim = c(-0, 20), ylim = c(-12, 17.5))
 # facet_zoom(xy = predicted_localisation %in% dense_granule_organelle)
+
+dg_clusters_ge <- factor(pred_cl[[2]][dg_subset])
+ge_col_pal <- Polychrome::green.armytage.colors(length(unique(dg_clusters_ge)))
+names(ge_col_pal) <- levels(dg_clusters_ge)
+
+
+p_tsne_dg3 <- plot_df |>
+  mutate(GE_cluster = factor(pred_cl[[2]]),
+         Shape = ifelse(predicted_localisation == "dense granules", "Yes", "No"),
+         Cluster_in_DG = factor(ifelse(Shape == "Yes", GE_cluster, NA))) |>
+  filter(GE_cluster %in% c(4, 8, 11, 12)) |>
+  ggplot(aes(x = tSNE_1, y = tSNE_2)) +
+  geom_point(aes(fill = Cluster_in_DG),
+             color = "#808080",
+             shape = 21,
+             size = 2.25
+             # alpha = 0.8
+  ) +
+  labs(x = "tSNE 1", y = "tSNE 2", fill = "Localisation") +
+  theme(legend.position = "bottom") +
+  scale_fill_manual(values = ge_col_pal, drop = FALSE) +
+  guides(color = guide_legend(ncol = 4)) +
+  scale_alpha(guide = "none") +
+  theme(
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank()
+  ) +
+  # ggplot(aes(x = tSNE_1, y = tSNE_2, color = GE_cluster)) +
+  # geom_point(alpha = 0.8) +
+  # labs(x = "tSNE 1", y = "tSNE 2", color = "Markers") +
+  # theme(legend.position = "bottom") +
+  # scale_color_manual(values = col_pal) +
+  # guides(color = guide_legend(ncol = 4)) +
+  coord_cartesian(xlim = c(-0, 20), ylim = c(-12, 17.5))
+# facet_zoom(xy = predicted_localisation %in% dense_granule_organelle)
+
+# ggsave("~/Desktop/gd_ge_cluster_tsne.pdf", device = "pdf")
 
 
 row_order <- c()
@@ -676,10 +797,20 @@ for (organelle in dense_granule_organelle) {
   row_order <- c(row_order, curr_proteins[ordered_indices])
 }
 
+row_order <- c()
+for(k in levels(dg_clusters_ge)) {
+  curr_cluster <- which(dg_clusters_ge == k)
+  n_genes <- length(curr_cluster)
+  cluster_ge_data <- dg_gene_expression_data[curr_cluster, ]
+  ordered_indices <- 1
+  if(n_genes > 1) {
+    ordered_indices <- findOrder(cluster_ge_data)
+  }
+  row_order <- c(row_order, curr_cluster[ordered_indices])
+}
+
 # row_order <- order(dg_predictions)
-dg_clusters_ge <- factor(pred_cl[[2]][dg_subset])
-ge_col_pal <- Polychrome::green.armytage.colors(length(unique(dg_clusters_ge)))
-names(ge_col_pal) <- levels(dg_clusters_ge)
+
 p_ge <- ggPheatmap(dg_gene_expression_data,
   dg_clusters_ge,
   row_order = row_order,
@@ -700,7 +831,7 @@ kept_genes <- which(dg_clusters_ge %in% kept_clusters)
 # group_2 <- seq(71, 78)
 # group_3 <- seq(110, 134)
 # group_4 <- c(seq(16, 70), seq(79, 109))
-# 
+#
 # n_group_1 <- length(group_1)
 # n_group_2 <- length(group_2)
 # n_group_3 <- length(group_3)
@@ -712,26 +843,26 @@ kept_genes <- which(dg_clusters_ge %in% kept_clusters)
 #   group_3,
 #   group_4
 # )
-# 
+#
 # merged_clusters <- c(
 #   rep(1, n_group_1),
 #   rep(2, n_group_2),
 #   rep(3, n_group_3),
 #   rep(4, n_group_4)
 # )
-# 
+#
 # dg_gene_expression_data[row_order, ][group_1, ] |> pheatmap::pheatmap(cluster_cols = FALSE, cluster_rows = FALSE)
 # dg_gene_expression_data[row_order, ][group_2, ] |> pheatmap::pheatmap(cluster_cols = FALSE, cluster_rows = FALSE)
 # dg_gene_expression_data[row_order, ][group_3, ] |> pheatmap::pheatmap(cluster_cols = FALSE, cluster_rows = FALSE)
 # dg_gene_expression_data[row_order, ][group_4, ] |> pheatmap::pheatmap(cluster_cols = FALSE, cluster_rows = FALSE)
-# 
+#
 # clusters_considered <- as.numeric(names(which(table(pred_cl[[2]][dg_subset]) > 2)))
 # final_dg_gene_set <- pred_cl[[2]][dg_subset][row_order] %in% clusters_considered
-# 
+#
 # annotatedHeatmap(dg_gene_expression_data[row_order, ][final_dg_gene_set, ], pred_cl[[2]][dg_subset][row_order][final_dg_gene_set], cluster_cols = FALSE, cluster_rows = FALSE)
 # pheatmap::pheatmap(dg_gene_expression_data[row_order, ][group_ordering, ], cluster_cols = FALSE, cluster_rows = FALSE)
 # annotatedHeatmap(dg_gene_expression_data[row_order, ][group_ordering, ], merged_clusters, cluster_cols = FALSE, cluster_rows = FALSE)
-# 
+#
 # lg_hg_clusters <- c(merged_clusters == 4) * 1 + 1
 # lg_hg_clusters <- c((merged_clusters == 3 * 1) + ((merged_clusters == 4) * 2) + 1)
 # annotatedHeatmap(dg_gene_expression_data[row_order, ][group_ordering, ], lg_hg_clusters, cluster_cols = FALSE, cluster_rows = FALSE)
@@ -752,7 +883,7 @@ dg_df$GE_cluster <- dg_clusters_ge
 # |>
 # pivot_longer(c(mdi.mcmc.allocation, tagm.mcmc.allocation), names_to = "Model", values_to = "Allocation")
 
-reduced_dg_df <- dg_df |> 
+reduced_dg_df <- dg_df |>
   filter(GE_cluster %in% kept_clusters)
 
 # reduced_dg_df <- dg_df[row_order, ][group_ordering, ]
@@ -774,28 +905,6 @@ p_dNdS <- reduced_dg_df |>
   labs(x = "Inferred cluster") +
   theme(legend.position = "None")
 
-# dg_df$Num.TMDs.TMHMM |> table()
-# dg_df$TMD.within.first.60.AA <- my_df$TMD.within.first.60.AA != "FALSE"
-
-# p_num_tmds_TMHMM <- dg_df |>
-#   filter(!Num.TMDs.TMHMM %in% c("apical 2", "ER 1", "ER 2", "micronemes", "rhoptries 2", "unknown")) |>
-#   mutate(Num.TMDs.TMHMM = as.numeric(Num.TMDs.TMHMM)) |>
-#   ggplot(aes(x = predicted_localisation, y = Num.TMDs.TMHMM, fill = predicted_localisation)) +
-#   facet_wrap(~Fixed) +
-#   geom_boxplot() +
-#   scale_fill_manual(values = col_pal)
-
-# p_conservation_score <- dg_df |>
-#   ggplot(aes(x = predicted_localisation, y = Conservation.score, fill = predicted_localisation)) +
-#   # facet_grid(~Model) +
-#   geom_boxplot() +
-#   scale_fill_manual(values = col_pal)
-# 
-# p_tmd_first_60_aa <- dg_df |>
-#   ggplot(aes(y = TMD.within.first.60.AA, group = predicted_localisation, fill = predicted_localisation)) +
-#   stat_count() +
-#   scale_fill_manual(values = col_pal)
-
 # === Save plots ==============================================================
 # p_patch <- p_dNdS / p_conservation_score / p_num_tmds_TMHMM / p_tmd_first_60_aa + plot_layout(guides = "collect")
 
@@ -809,12 +918,42 @@ p_full <- (p_tsne_dg + p_ge + p_dNdS) +
 # theme(legend.position = "bottom")
 # p_ge
 
-ggsave("Plots/fig5DenseGranules.png", plot = p_full, height = 10.0, width = 16.0)
+ggsave("Plots/Fig5/fig5DenseGranules.png",
+  plot = p_full,
+  height = 20.0,
+  width = 23.0
+)
 
-ggsave("Plots/Fig5/fig5AtSNE.png", plot = p_tsne_dg, height = 5.0, width = 8.0)
+ggsave("Plots/Fig5/fig5DenseGranulesClusterOrdered.pdf",
+  plot = p_full,
+  device = "pdf",
+  height = 10.0,
+  width = 11.05
+)
+
+ggsave("Plots/Fig5/fig5AtSNE.png",
+  plot = p_tsne_dg,
+  height = 10.0,
+  width = 12.0
+)
 ggsave("Plots/Fig5/fig5BGE.png", plot = p_ge, height = 10.0, width = 8.0)
 ggsave("Plots/Fig5/fig5CdNdS.png", plot = p_dNdS, height = 5.0, width = 8.0)
 
-ggsave("Plots/Fig5/fig5AtSNE.pdf", plot = p_tsne_dg, height = 5.0, width = 8.0)
-ggsave("Plots/Fig5/fig5BGE.pdf", plot = p_ge, height = 10.0, width = 8.0)
-ggsave("Plots/Fig5/fig5CdNdS.pdf", plot = p_dNdS, height = 5.0, width = 8.0)
+ggsave("Plots/Fig5/fig5AtSNE.pdf",
+  plot = p_tsne_dg,
+  device = "pdf",
+  height = 10.0,
+  width = 12.0
+)
+ggsave("Plots/Fig5/fig5BGE.pdf",
+  plot = p_ge,
+  device = "pdf",
+  height = 10.0,
+  width = 8.0
+)
+ggsave("Plots/Fig5/fig5CdNdS.pdf",
+  plot = p_dNdS,
+  device = "pdf",
+  height = 5.0,
+  width = 8.0
+)
