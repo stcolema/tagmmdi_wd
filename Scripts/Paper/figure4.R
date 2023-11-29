@@ -532,7 +532,17 @@ ggPheatmap <- function(X, markers, col_pal, row_order = NULL, include_dendogram 
 # === MAIN =====================================================================
 
 cat("\n=== Running ``processTGondiiCCoutput.R`` ===============================")
-setMyTheme()
+ggplot2::theme_set(ggplot2::theme_bw()
++ ggplot2::theme(
+    strip.background = ggplot2::element_rect(fill = "#21677e"),
+    strip.text = ggplot2::element_text(colour = "white"),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    # legend.text = element_text(size=11),
+    legend.title = element_text(face = "bold"),
+    # axis.title = element_text(size=12)
+  ))
+# setMyTheme()
 set.seed(1)
 
 args <- input_arguments()
@@ -702,9 +712,9 @@ plot_df <- data.frame(
   predicted_localisation = predicted_localisation,
   Probability = localisation_probability,
   TAGM_prediction = factor(tagm_comparison$tagm.mcmc.allocation,
-                           levels = marker_levels[-27],
-                           labels = marker_labels[-27]
-                           ),
+    levels = marker_levels[-27],
+    labels = marker_labels[-27]
+  ),
   TAGM_probability = tagm_comparison$tagm.mcmc.probability
 ) |>
   mutate(Marker_protein = markers != "all other proteins")
@@ -849,20 +859,26 @@ p_tsne <- plot_df |>
   labs(x = "tSNE 1", y = "tSNE 2", fill = "Localisation") +
   theme(legend.position = "bottom") +
   scale_fill_manual(values = col_pal, drop = FALSE) +
-  guides(color = guide_legend(ncol = 4)) +
+  guides(fill = guide_legend(nrow = 6, override.aes = list(size = 7))) +
   scale_alpha(guide = "none") +
   theme(
     panel.grid.major = element_blank(),
-    panel.grid.minor = element_blank()
+    panel.grid.minor = element_blank(),
+    legend.text = element_text(size = 11),
+    legend.title = element_text(face = "bold", angle = 90),
+    axis.title = element_text(size = 12)
   )
 
 p_tsne_seccretory <- plot_df |>
   # dplyr::filter(predicted_localisation %in% secretory_organelles) |>
   dplyr::filter(predicted_localisation %in% secretory_organelles | TAGM_prediction %in% secretory_organelles) |>
   ggplot(aes(x = tSNE_1, y = tSNE_2)) +
-  geom_point(aes(fill = predicted_localisation,
-                 alpha = Probability,
-                 shape = Marker_protein),
+  geom_point(
+    aes(
+      fill = predicted_localisation,
+      alpha = Probability,
+      shape = Marker_protein
+    ),
     color = "#808080",
     # shape = 21,
     size = 1.5,
@@ -871,24 +887,29 @@ p_tsne_seccretory <- plot_df |>
   labs(x = "tSNE 1", y = "tSNE 2", fill = "Localisation", shape = "Marker protein") +
   theme(legend.position = "bottom") +
   scale_fill_manual(values = col_pal, drop = FALSE, guide = "none") +
-  guides(color = guide_legend(ncol = 4)) +
+  scale_shape_manual(values = c(21, 23)) +
+  # guides(fill = guide_legend(nrow = 4, override.aes = list(size = 7))) +
+  guides(shape = guide_legend(nrow = 2)) +
   scale_alpha(guide = "none") +
   theme(
-    panel.grid.major = element_blank(),
-    panel.grid.minor = element_blank()
-  ) +
-  scale_shape_manual(values = c(21, 23))
+    legend.text = element_text(size = 11),
+    legend.title = element_text(size = 13),
+    axis.title = element_text(size = 12)
+  )
 
 p_tsne_seccretory_tagm <- plot_df |>
   dplyr::filter(predicted_localisation %in% secretory_organelles | TAGM_prediction %in% secretory_organelles) |>
   ggplot(aes(x = tSNE_1, y = tSNE_2)) +
-  geom_point(aes(fill = TAGM_prediction,
-                 alpha = TAGM_probability,
-                 shape = Marker_protein),
-             color = "#808080",
-             # shape = 21,
-             size = 1.5,
-             # alpha = 0.8
+  geom_point(
+    aes(
+      fill = TAGM_prediction,
+      alpha = TAGM_probability,
+      shape = Marker_protein
+    ),
+    color = "#808080",
+    # shape = 21,
+    size = 1.5,
+    # alpha = 0.8
   ) +
   labs(x = "tSNE 1", y = "tSNE 2", fill = "Localisation", shape = "Marker protein") +
   theme(legend.position = "bottom") +
@@ -925,10 +946,13 @@ for (organelle in secretory_organelles) {
 
 # row_order <- order(secretory_predictions)
 
+cb_friendly_col_pal <- ggthemes::colorblind_pal()(8) |>
+  magrittr::set_names(c(secretory_organelles, "dense granules"))
+
 p_ge <- ggPheatmap(secretory_gene_expression_data,
   secretory_predictions,
   row_order = row_order,
-  col_pal = col_pal,
+  col_pal = cb_friendly_col_pal,
   include_dendogram = FALSE
 ) +
   labs(fill = "Gene\nexpression")
@@ -970,20 +994,20 @@ p_ge <- ggPheatmap(secretory_gene_expression_data,
 # p_ge <- ggPheatmap(microarray_mat, predicted_localisation, col_pal, include_dendogram = FALSE)
 
 # # === Biochemical properties ===================================================
-# 
+#
 # protein_biochemical_properties <- read.csv("./T_gondii/TGondiiGolgiProteinsAttributes.csv", row.names = 1)
-# 
+#
 # tagm_secretory_subset <- tagm_predictions %in% secretory_organelles
 # tagm_secretory_proteins <- row.names(plot_df)[tagm_secretory_subset]
 # all_secretory_proteins <- c(secretory_proteins, tagm_secretory_proteins) |> unique()
-# 
+#
 # rel_protein_biochemical_properties <- protein_biochemical_properties[all_secretory_proteins, ]
 # secretory_tSNE_df <- plot_df[all_secretory_proteins, ]
-# 
+#
 # secretory_df <- cbind(secretory_tSNE_df, rel_protein_biochemical_properties[, -c(2, 4)]) |>
 #   pivot_longer(c(predicted_localisation, tagm.mcmc.allocation), names_to = "Prediction_origin", values_to = "Localisation") |>
 #   dplyr::mutate(Model = ifelse(Prediction_origin == "predicted_localisation", "MDI", "TAGM"))
-# 
+#
 # secretory_df$pI <- as.numeric(secretory_df$pI)
 # secretory_df$Fixed <- secretory_df$markers != "all other proteins"
 # p_pI <- secretory_df |>
@@ -992,12 +1016,12 @@ p_ge <- ggPheatmap(secretory_gene_expression_data,
 #   # facet_wrap(~Model) +
 #   geom_boxplot()
 # # scale_fill_manual(values = col_pal)
-# 
+#
 # # x12 <- secretory_df |>
 # #   dplyr::filter(Localisation == "ER 2", Model == "MDI") |>
 # #   dplyr::select(dNdS)
 # # hist(x12$dNdS)
-# 
+#
 # p_dNdS <- secretory_df |>
 #   dplyr::filter(Localisation %in% secretory_organelles) |>
 #   ggplot(aes(x = Localisation, y = log(1 + dNdS), fill = Model)) +
@@ -1006,10 +1030,10 @@ p_ge <- ggPheatmap(secretory_gene_expression_data,
 #   # scale_fill_manual(values = col_pal) +
 #   theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)) +
 #   theme(legend.position = "bottom")
-# 
+#
 # # secretory_df$Num.TMDs.TMHMM |> table()
 # # # secretory_df$TMD.within.first.60.AA <- my_df$TMD.within.first.60.AA != "FALSE"
-# 
+#
 # # p_num_tmds_TMHMM <- secretory_df |>
 # #   dplyr::filter(Localisation %in% secretory_organelles) |>
 # #   filter(!Num.TMDs.TMHMM %in% c("apical 2", "ER 1", "ER 2", "micronemes", "rhoptries 2", "unknown")) |>
@@ -1018,60 +1042,76 @@ p_ge <- ggPheatmap(secretory_gene_expression_data,
 # #   facet_wrap(~Model) +
 # #   geom_boxplot() +
 # #   scale_fill_manual(values = col_pal)
-# # 
+# #
 # # p_conservation_score <- secretory_df |>
 # #   dplyr::filter(Localisation %in% secretory_organelles) |>
 # #   ggplot(aes(x = Localisation, y = Conservation.score, fill = Localisation)) +
 # #   facet_grid(~Model) +
 # #   geom_boxplot() +
 # #   scale_fill_manual(values = col_pal)
-# # 
+# #
 # # p_tmd_first_60_aa <- secretory_df |>
 # #   dplyr::filter(Localisation %in% secretory_organelles) |>
 # #   ggplot(aes(y = TMD.within.first.60.AA, group = Localisation, fill = Localisation)) +
 # #   stat_count() +
 # #   facet_grid(~Model) +
 # #   scale_fill_manual(values = col_pal)
-# # 
+# #
 # # p_patch <- p_dNdS / p_conservation_score / p_num_tmds_TMHMM / p_tmd_first_60_aa + plot_layout(guides = "collect")
-# 
+#
 
 # === Comparison allocations ===================================================
 
 mdi_tagm_alloc <- read.csv(file = "~/Desktop/TGOndiiMDIandTAGM.csv")
 
 
-cohere <- mdi_tagm_alloc %>% filter(mdi.mcmc.allocation %in%
-                                      c("dense granules",
-                                        "rhoptries 1",
-                                        "rhoptries 2",
-                                        "apical 1",
-                                        "apical 2",
-                                        "micronemes")) %>%
+cohere <- mdi_tagm_alloc %>%
+  filter(mdi.mcmc.allocation %in%
+    c(
+      "dense granules",
+      "rhoptries 1",
+      "rhoptries 2",
+      "apical 1",
+      "apical 2",
+      "micronemes"
+    )) %>%
   mutate(samealloc = tagm.mcmc.allocation == mdi.mcmc.allocation)
 
 p1 <- cohere %>%
-  ggplot(aes(x = tagm.mcmc.probability,
-             y = mdi.mcmc.probability,
-             fill = mdi.mcmc.allocation,
-             shape = !samealloc)
-  ) +
-  theme_bw() + 
+  ggplot(aes(
+    x = tagm.mcmc.probability,
+    y = mdi.mcmc.probability,
+    fill = mdi.mcmc.allocation,
+    shape = !samealloc
+  )) +
+  theme_bw() +
   geom_point(size = 2, alpha = 0.9, color = "#808080") +
   # theme(text = element_text(size = 20)) +
-  ylim(c(0.3,1)) + 
+  ylim(c(0.3, 1)) +
   xlim(c(0.3, 1)) +
-  coord_fixed() + 
-  geom_abline(slope=1, intercept = 0, linewidth = 1) +
-  labs(shape = "Different\nclassification", 
-       x = "TAGM allocation probability",
-       y = "MDI allocation probability",
-       fill = "MDI predicted\nlocalisation") +
-  scale_fill_manual(values = col_pal) +
+  coord_fixed() +
+  geom_abline(slope = 1, intercept = 0, linewidth = 1) +
+  labs(
+    shape = "Different\nclassification",
+    x = "TAGM allocation probability",
+    y = "MDI allocation probability",
+    fill = "MDI predicted\nlocalisation"
+  ) +
+  # ggthemes::scale_fill_colorblind() +
+  scale_fill_manual(values = cb_friendly_col_pal) +
+  # scale_fill_manual(values = col_pal) +
   scale_shape_manual(values = c(21, 24)) +
-  guides(fill = guide_legend(override.aes = list(shape=21))) +
-  theme(legend.position="bottom")
-
+  guides(
+    fill = guide_legend(override.aes = list(shape = 21, size = 6), nrow = 3),
+    shape = guide_legend(nrow = 2)
+  ) +
+  theme(
+    legend.position = "bottom",
+    legend.title = element_text(face = "bold", size = 12),
+    legend.text = element_text(size = 11),
+    axis.title = element_text(size = 12)
+  )
+    
 
 # === Save plots ===============================================================
 layout <- c("
@@ -1116,11 +1156,11 @@ ggsave("Plots/Fig6/fig6BSecretoryOrganellestSNESecretory.pdf",
 )
 
 
-ggsave("./Plots/Fig6/CompareTAGMandMDIallocationFig6D.pdf", 
-       plot = p1,
-       device = "pdf",
-       width = 4.0,
-       height = 4.86
+ggsave("./Plots/Fig6/CompareTAGMandMDIallocationFig6D.pdf",
+  plot = p1,
+  device = "pdf",
+  width = 4.0 * 1.25,
+  height = 4.86 * 1.25
 )
 
 
